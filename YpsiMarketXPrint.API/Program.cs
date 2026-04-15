@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Scalar.AspNetCore;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using YpsiMarketXPrint.API.Data;
-using Scalar.AspNetCore;
 
 namespace YpsiMarketXPrint.API
 {
@@ -19,6 +20,7 @@ namespace YpsiMarketXPrint.API
                 options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
             // JWT Authentication
+            JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
             builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
                 {
@@ -32,6 +34,24 @@ namespace YpsiMarketXPrint.API
                         ValidAudience = builder.Configuration["Jwt:Audience"],
                         IssuerSigningKey = new SymmetricSecurityKey(
                             Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+                    };
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnAuthenticationFailed = context =>
+                        {
+                            Console.WriteLine("Auth failed: " + context.Exception.Message);
+                            return Task.CompletedTask;
+                        },
+                        OnTokenValidated = context =>
+                        {
+                            Console.WriteLine("Token validated for: " + context.Principal?.Identity?.Name);
+                            return Task.CompletedTask;
+                        },
+                        OnChallenge = context =>
+                        {
+                            Console.WriteLine("Challenge error: " + context.Error + " - " + context.ErrorDescription);
+                            return Task.CompletedTask;
+                        }
                     };
                 });
 
