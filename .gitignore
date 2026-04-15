@@ -2,6 +2,9 @@
 appsettings.json
 appsettings.Development.json
 
+## Docker
+docker-compose.yml
+
 ## Build results
 bin/
 obj/

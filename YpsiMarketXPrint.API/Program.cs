@@ -5,6 +5,7 @@ using Scalar.AspNetCore;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using YpsiMarketXPrint.API.Data;
+using YpsiMarketXPrint.API.Models;
 
 namespace YpsiMarketXPrint.API
 {
@@ -71,6 +72,28 @@ namespace YpsiMarketXPrint.API
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();
+
+            using (var scope = app.Services.CreateScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+                
+                db.Database.Migrate();
+
+                if (!db.Users.Any(u => u.UserType == "admin"))
+                {
+                    db.Users.Add(new User
+                    {
+                        FirstName = "Admin",
+                        LastName = "User",
+                        Email = config["Seed:AdminEmail"]!,
+                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(config["Seed:AdminPassword"]!),
+                        UserType = "admin"
+                    });
+                    db.SaveChanges();
+                }
+            }
+
             app.Run();
         }
     }

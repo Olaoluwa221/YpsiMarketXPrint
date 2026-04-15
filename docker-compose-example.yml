@@ -1,0 +1,37 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: ypsiprint-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: yourpassword
+      MYSQL_DATABASE: YpsiPrint
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pyourpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./YpsiMarketXPrint.API
+      dockerfile: Dockerfile
+    container_name: ypsiprint-api
+    ports:
+      - "8080:8080"
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=mysql;Database=YpsiPrint;User=root;Password=yourpassword;
+      - Jwt__Key=your_secret_key_here
+      - Jwt__Issuer=YpsiMarketXPrint
+      - Jwt__Audience=YpsiMarketXPrint
+      - Seed__AdminEmail=admin@yoursite.com
+      - Seed__AdminPassword=yourpassword
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql-data:
