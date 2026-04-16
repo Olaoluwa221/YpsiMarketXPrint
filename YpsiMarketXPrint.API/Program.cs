@@ -15,6 +15,16 @@ namespace YpsiMarketXPrint.API
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            // Allow requests from the React frontend during development
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowFrontend", policy =>
+                {
+                    policy.WithOrigins("http://localhost:5173")
+                        .AllowAnyHeader()
+                        .AllowAnyMethod();
+                });
+            });
             // Database
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
             builder.Services.AddDbContext<AppDbContext>(options => 
@@ -68,6 +78,7 @@ namespace YpsiMarketXPrint.API
                 app.MapScalarApiReference();
             }
 
+            app.UseCors("AllowFrontend");
             app.UseHttpsRedirection();
             app.UseAuthentication();
             app.UseAuthorization();

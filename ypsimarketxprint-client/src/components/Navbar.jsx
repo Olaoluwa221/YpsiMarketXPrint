@@ -11,32 +11,41 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-      <Link to="/" className="text-xl font-semibold text-gray-900">
-        YpsiMarketXPrint
+    <nav style={{ backgroundColor: '#1B2A4A' }} className="px-8 py-4 flex items-center justify-between">
+      <Link to="/" className="flex items-center gap-3">
+        <span className="text-white font-bold text-lg tracking-wide">
+          Ypsi Marketing & Print
+        </span>
       </Link>
 
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-8">
         {user?.userType === 'admin' ? (
           <>
-            <Link to="/admin" className="text-sm text-gray-600 hover:text-gray-900">Dashboard</Link>
-            <Link to="/admin/products" className="text-sm text-gray-600 hover:text-gray-900">Products</Link>
-            <Link to="/admin/orders" className="text-sm text-gray-600 hover:text-gray-900">Orders</Link>
+            <Link to="/admin" className="text-sm text-gray-300 hover:text-white px-1 py-2 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-orange-500 after:transition-all after:duration-300">Dashboard</Link>
+            <Link to="/admin/products" className="text-sm text-gray-300 hover:text-white px-1 py-2 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-orange-500 after:transition-all after:duration-300">Products</Link>
+            <Link to="/admin/orders" className="text-sm text-gray-300 hover:text-white px-1 py-2 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-orange-500 after:transition-all after:duration-300">Orders</Link>
           </>
         ) : (
           <>
-            <Link to="/products" className="text-sm text-gray-600 hover:text-gray-900">Shop</Link>
-            <Link to="/cart" className="text-sm text-gray-600 hover:text-gray-900">Cart</Link>
-            {user && <Link to="/profile" className="text-sm text-gray-600 hover:text-gray-900">Profile</Link>}
+            <Link to="/products" className="text-sm text-gray-300 hover:text-white px-1 py-2 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-orange-500 after:transition-all after:duration-300">Shop</Link>
+            <Link to="/cart" className="text-sm text-gray-300 hover:text-white px-1 py-2 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-orange-500 after:transition-all after:duration-300">Cart</Link>
+            {user && <Link to="/profile" className="text-sm text-gray-300 hover:text-white px-1 py-2 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-orange-500 after:transition-all after:duration-300">Profile</Link>}
           </>
         )}
 
         {user ? (
-          <button onClick={handleLogout} className="text-sm text-gray-600 hover:text-gray-900">
+          <button
+            onClick={handleLogout}
+            className="text-sm text-gray-300 hover:text-white px-1 py-2 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-orange-500 after:transition-all after:duration-300"
+          >
             Logout
           </button>
         ) : (
-          <Link to="/login" className="text-sm bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+          <Link
+            to="/login"
+            style={{ backgroundColor: '#E8620A' }}
+            className="text-sm text-white px-5 py-2 rounded-lg hover:opacity-90 transition-opacity font-medium"
+          >
             Login
           </Link>
         )}
