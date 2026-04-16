@@ -1,5 +1,23 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+
+function NavItem({ to, children }) {
+  return (
+    <NavLink
+      to={to}
+      end
+      className={({ isActive }) =>
+        `text-sm px-5 py-3 rounded-lg border-b-2 transition-colors duration-200 ${
+          isActive
+            ? 'text-white border-orange-500 bg-white/10'
+            : 'text-gray-300 hover:text-white border-transparent hover:border-orange-500 hover:bg-white/10'
+        }`
+      }
+    >
+      {children}
+    </NavLink>
+  )
+}
 
 export default function Navbar() {
   const { user, logout } = useAuth()
@@ -12,31 +30,29 @@ export default function Navbar() {
 
   return (
     <nav style={{ backgroundColor: '#1B2A4A' }} className="px-8 py-4 flex items-center justify-between">
-      <Link to="/" className="flex items-center gap-3">
-        <span className="text-white font-bold text-lg tracking-wide">
-          Ypsi Marketing & Print
-        </span>
+      <Link to="/" className="text-white font-bold text-lg tracking-wide">
+        Ypsi Marketing & Print
       </Link>
 
-      <div className="flex items-center gap-8">
+      <div className="flex items-center gap-4">
         {user?.userType === 'admin' ? (
           <>
-            <Link to="/admin" className="text-sm text-gray-300 hover:text-white px-1 py-2 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-orange-500 after:transition-all after:duration-300">Dashboard</Link>
-            <Link to="/admin/products" className="text-sm text-gray-300 hover:text-white px-1 py-2 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-orange-500 after:transition-all after:duration-300">Products</Link>
-            <Link to="/admin/orders" className="text-sm text-gray-300 hover:text-white px-1 py-2 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-orange-500 after:transition-all after:duration-300">Orders</Link>
+            <NavItem to="/admin">Dashboard</NavItem>
+            <NavItem to="/admin/products">Products</NavItem>
+            <NavItem to="/admin/orders">Orders</NavItem>
           </>
         ) : (
           <>
-            <Link to="/products" className="text-sm text-gray-300 hover:text-white px-1 py-2 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-orange-500 after:transition-all after:duration-300">Shop</Link>
-            <Link to="/cart" className="text-sm text-gray-300 hover:text-white px-1 py-2 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-orange-500 after:transition-all after:duration-300">Cart</Link>
-            {user && <Link to="/profile" className="text-sm text-gray-300 hover:text-white px-1 py-2 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-orange-500 after:transition-all after:duration-300">Profile</Link>}
+            <NavItem to="/products">Shop</NavItem>
+            <NavItem to="/cart">Cart</NavItem>
+            {user && <NavItem to="/profile">Profile</NavItem>}
           </>
         )}
 
         {user ? (
           <button
             onClick={handleLogout}
-            className="text-sm text-gray-300 hover:text-white px-1 py-2 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-orange-500 after:transition-all after:duration-300"
+            className="text-sm text-gray-300 hover:text-white px-5 py-3 rounded-lg border-b-2 border-transparent hover:border-orange-500 hover:bg-white/10 transition-colors duration-200"
           >
             Logout
           </button>
