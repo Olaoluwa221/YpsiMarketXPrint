@@ -12,7 +12,7 @@ using YpsiMarketXPrint.API.Data;
 namespace YpsiMarketXPrint.API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260401135907_InitialCreate")]
+    [Migration("20260416191820_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -155,11 +155,12 @@ namespace YpsiMarketXPrint.API.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
-                    b.Property<string>("ProductType")
-                        .IsRequired()
-                        .HasColumnType("longtext");
+                    b.Property<int>("ProductTypeId")
+                        .HasColumnType("int");
 
                     b.HasKey("ProductId");
+
+                    b.HasIndex("ProductTypeId");
 
                     b.ToTable("Products");
                 });
@@ -180,6 +181,23 @@ namespace YpsiMarketXPrint.API.Migrations
                     b.HasIndex("PictureId");
 
                     b.ToTable("ProductPictures");
+                });
+
+            modelBuilder.Entity("YpsiMarketXPrint.API.Models.ProductType", b =>
+                {
+                    b.Property<int>("ProductTypeId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("ProductTypeId"));
+
+                    b.Property<string>("TypeName")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
+                    b.HasKey("ProductTypeId");
+
+                    b.ToTable("ProductTypes");
                 });
 
             modelBuilder.Entity("YpsiMarketXPrint.API.Models.User", b =>
@@ -284,6 +302,17 @@ namespace YpsiMarketXPrint.API.Migrations
                     b.Navigation("Uploader");
                 });
 
+            modelBuilder.Entity("YpsiMarketXPrint.API.Models.Product", b =>
+                {
+                    b.HasOne("YpsiMarketXPrint.API.Models.ProductType", "ProductType")
+                        .WithMany("Products")
+                        .HasForeignKey("ProductTypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProductType");
+                });
+
             modelBuilder.Entity("YpsiMarketXPrint.API.Models.ProductPicture", b =>
                 {
                     b.HasOne("YpsiMarketXPrint.API.Models.Picture", "Picture")
@@ -325,6 +354,11 @@ namespace YpsiMarketXPrint.API.Migrations
                     b.Navigation("OrderItems");
 
                     b.Navigation("ProductPictures");
+                });
+
+            modelBuilder.Entity("YpsiMarketXPrint.API.Models.ProductType", b =>
+                {
+                    b.Navigation("Products");
                 });
 
             modelBuilder.Entity("YpsiMarketXPrint.API.Models.User", b =>

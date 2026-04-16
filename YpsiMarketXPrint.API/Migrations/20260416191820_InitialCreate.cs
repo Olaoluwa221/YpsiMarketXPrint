@@ -16,22 +16,17 @@ namespace YpsiMarketXPrint.API.Migrations
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
-                name: "Products",
+                name: "ProductTypes",
                 columns: table => new
                 {
-                    ProductId = table.Column<int>(type: "int", nullable: false)
+                    ProductTypeId = table.Column<int>(type: "int", nullable: false)
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
-                    ProductName = table.Column<string>(type: "longtext", nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4"),
-                    ProductType = table.Column<string>(type: "longtext", nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4"),
-                    ProductSize = table.Column<string>(type: "longtext", nullable: false)
-                        .Annotation("MySql:CharSet", "utf8mb4"),
-                    Price = table.Column<decimal>(type: "decimal(10,2)", nullable: false)
+                    TypeName = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Products", x => x.ProductId);
+                    table.PrimaryKey("PK_ProductTypes", x => x.ProductTypeId);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
@@ -55,6 +50,31 @@ namespace YpsiMarketXPrint.API.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Users", x => x.UserId);
+                })
+                .Annotation("MySql:CharSet", "utf8mb4");
+
+            migrationBuilder.CreateTable(
+                name: "Products",
+                columns: table => new
+                {
+                    ProductId = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
+                    ProductName = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ProductTypeId = table.Column<int>(type: "int", nullable: false),
+                    ProductSize = table.Column<string>(type: "longtext", nullable: false)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    Price = table.Column<decimal>(type: "decimal(10,2)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Products", x => x.ProductId);
+                    table.ForeignKey(
+                        name: "FK_Products_ProductTypes_ProductTypeId",
+                        column: x => x.ProductTypeId,
+                        principalTable: "ProductTypes",
+                        principalColumn: "ProductTypeId",
+                        onDelete: ReferentialAction.Cascade);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
@@ -234,6 +254,11 @@ namespace YpsiMarketXPrint.API.Migrations
                 name: "IX_ProductPictures_PictureId",
                 table: "ProductPictures",
                 column: "PictureId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Products_ProductTypeId",
+                table: "Products",
+                column: "ProductTypeId");
         }
 
         /// <inheritdoc />
@@ -262,6 +287,9 @@ namespace YpsiMarketXPrint.API.Migrations
 
             migrationBuilder.DropTable(
                 name: "Users");
+
+            migrationBuilder.DropTable(
+                name: "ProductTypes");
         }
     }
 }

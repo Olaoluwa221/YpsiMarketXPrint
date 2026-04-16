@@ -23,13 +23,14 @@ namespace YpsiMarketXPrint.API.Controllers
         public async Task<IActionResult> GetAll()
         {
             var products = await _context.Products
+                .Include(p => p.ProductType)
                 .Include(p => p.ProductPictures)
                     .ThenInclude(pp => pp.Picture)
                 .Select(p => new ProductDto
                 {
                     ProductId = p.ProductId,
                     ProductName = p.ProductName,
-                    ProductType = p.ProductType,
+                    ProductType = p.ProductType.TypeName,
                     ProductSize = p.ProductSize,
                     Price = p.Price,
                     PrimaryImageLink = p.ProductPictures
@@ -42,11 +43,24 @@ namespace YpsiMarketXPrint.API.Controllers
             return Ok(products);
         }
 
+        // GET api/products/types - public
+        [HttpGet("types")]
+        public async Task<IActionResult> GetTypes()
+        {
+            var types = await _context.ProductTypes
+                .OrderBy(t => t.TypeName)
+                .Select(t => new { t.ProductTypeId, t.TypeName })
+                .ToListAsync();
+
+            return Ok(types);
+        }
+
         // GET api/products/1 - public
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
             var product = await _context.Products
+                .Include(p => p.ProductType)
                 .Include(p => p.ProductPictures)
                     .ThenInclude(pp => pp.Picture)
                 .FirstOrDefaultAsync(p => p.ProductId == id);
@@ -57,7 +71,7 @@ namespace YpsiMarketXPrint.API.Controllers
             {
                 ProductId = product.ProductId,
                 ProductName = product.ProductName,
-                ProductType = product.ProductType,
+                ProductType = product.ProductType.TypeName,
                 ProductSize = product.ProductSize,
                 Price = product.Price,
                 PrimaryImageLink = product.ProductPictures
@@ -74,10 +88,13 @@ namespace YpsiMarketXPrint.API.Controllers
         [Authorize(Roles = "admin")]
         public async Task<IActionResult> Create(CreateProductDto dto)
         {
+            var productType = await _context.ProductTypes.FindAsync(dto.ProductTypeId);
+            if (productType == null) return BadRequest("Invalid product type.");
+
             var product = new Product
             {
                 ProductName = dto.ProductName,
-                ProductType = dto.ProductType,
+                ProductTypeId = dto.ProductTypeId,
                 ProductSize = dto.ProductSize,
                 Price = dto.Price
             };
@@ -97,9 +114,14 @@ namespace YpsiMarketXPrint.API.Controllers
             if (product == null) return NotFound();
 
             if (dto.ProductName != null) product.ProductName = dto.ProductName;
-            if (dto.ProductType != null) product.ProductType = dto.ProductType;
             if (dto.ProductSize != null) product.ProductSize = dto.ProductSize;
             if (dto.Price.HasValue) product.Price = dto.Price.Value;
+            if (dto.ProductTypeId.HasValue)
+            {
+                var productType = await _context.ProductTypes.FindAsync(dto.ProductTypeId.Value);
+                if (productType == null) return BadRequest("Invalid product type.");
+                product.ProductTypeId = dto.ProductTypeId.Value;
+            }
 
             await _context.SaveChangesAsync();
             return Ok(product);

@@ -13,7 +13,7 @@
     public class CreateProductDto
     {
         public string ProductName { get; set; } = null!;
-        public string ProductType { get; set; } = null!;
+        public int ProductTypeId { get; set; }
         public string ProductSize { get; set; } = null!;
         public decimal Price { get; set; }
     }
@@ -21,7 +21,7 @@
     public class UpdateProductDto
     {
         public string? ProductName { get; set; }
-        public string? ProductType { get; set; }
+        public int? ProductTypeId { get; set; }
         public string? ProductSize { get; set; }
         public decimal? Price { get; set; }
     }
