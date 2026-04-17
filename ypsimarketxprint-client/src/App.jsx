@@ -10,7 +10,6 @@ import Products from './pages/Products'
 import ProductDetail from './pages/ProductDetail'
 import Cart from './pages/Cart'
 import Checkout from './pages/Checkout'
-import OrderConfirmation from './pages/OrderConfirmation'
 import Profile from './pages/Profile'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminProducts from './pages/admin/AdminProducts'
@@ -39,9 +38,6 @@ function App() {
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={
             <ProtectedRoute><Checkout /></ProtectedRoute>
-          } />
-          <Route path="/order-confirmation/:id" element={
-            <ProtectedRoute><OrderConfirmation /></ProtectedRoute>
           } />
           <Route path="/profile" element={
             <ProtectedRoute><Profile /></ProtectedRoute>
