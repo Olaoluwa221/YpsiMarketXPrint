@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
 using YpsiMarketXPrint.API.Data;
 using YpsiMarketXPrint.API.DTOs;
 using YpsiMarketXPrint.API.Models;
@@ -20,21 +20,22 @@ namespace YpsiMarketXPrint.API.Controllers
             _context = context;
         }
 
-        private int GetUserId() =>
-            int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        private int GetUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         private async Task<Cart> GetOrCreateCart(int userId)
         {
-            var cart = await _context.Carts
-                .FirstOrDefaultAsync(c => c.UserId == userId);
-
+            var cart = await _context.Carts.FirstOrDefaultAsync(c => c.UserId == userId);
             if (cart == null)
             {
-                cart = new Cart { UserId = userId, CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
+                cart = new Cart
+                {
+                    UserId = userId,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                };
                 _context.Carts.Add(cart);
                 await _context.SaveChangesAsync();
             }
-
             return cart;
         }
 
@@ -45,30 +46,28 @@ namespace YpsiMarketXPrint.API.Controllers
             var userId = GetUserId();
             var cart = await GetOrCreateCart(userId);
 
-            var items = await _context.CartItems
-                .Where(ci => ci.CartId == cart.CartId)
-                .Include(ci => ci.Product)
-                    .ThenInclude(p => p.ProductPictures)
-                        .ThenInclude(pp => pp.Picture)
+            var items = await _context
+                .CartItems.Where(ci => ci.CartId == cart.CartId)
+                .Include(ci => ci.Variant)
+                    .ThenInclude(v => v.Product)
+                        .ThenInclude(p => p.ProductPictures)
+                            .ThenInclude(pp => pp.Picture)
                 .Select(ci => new CartItemDto
                 {
-                    ProductId = ci.ProductId,
-                    ProductName = ci.Product.ProductName,
-                    ProductSize = ci.Product.ProductSize,
-                    Price = ci.Product.Price,
+                    VariantId = ci.VariantId,
+                    ProductId = ci.Variant.ProductId,
+                    ProductName = ci.Variant.Product.ProductName,
+                    Size = ci.Variant.Size,
+                    Price = ci.Variant.Price,
                     Quantity = ci.Quantity,
-                    ImageLink = ci.Product.ProductPictures
-                    .Where(pp => pp.IsPrimary)
-                    .Select(pp => pp.Picture.Link)
-                    .FirstOrDefault()
+                    ImageLink = ci
+                        .Variant.Product.ProductPictures.Where(pp => pp.IsPrimary)
+                        .Select(pp => pp.Picture.Link)
+                        .FirstOrDefault(),
                 })
                 .ToListAsync();
 
-            return Ok(new CartDto
-            {
-                CartId = cart.CartId,
-                Items = items
-            });
+            return Ok(new CartDto { CartId = cart.CartId, Items = items });
         }
 
         // POST api/cart/items
@@ -78,24 +77,25 @@ namespace YpsiMarketXPrint.API.Controllers
             var userId = GetUserId();
             var cart = await GetOrCreateCart(userId);
 
-            var product = await _context.Products.FindAsync(dto.ProductId);
-            if (product == null) return NotFound("Product not found.");
+            var variant = await _context.ProductVariants.FindAsync(dto.VariantId);
+            if (variant == null)
+                return NotFound("Variant not found.");
 
-            var existing = await _context.CartItems
-                .FindAsync(cart.CartId, dto.ProductId);
-
+            var existing = await _context.CartItems.FindAsync(cart.CartId, dto.VariantId);
             if (existing != null)
             {
                 existing.Quantity += dto.Quantity;
             }
             else
             {
-                _context.CartItems.Add(new CartItem
-                {
-                    CartId = cart.CartId,
-                    ProductId = dto.ProductId,
-                    Quantity = dto.Quantity
-                });
+                _context.CartItems.Add(
+                    new CartItem
+                    {
+                        CartId = cart.CartId,
+                        VariantId = dto.VariantId,
+                        Quantity = dto.Quantity,
+                    }
+                );
             }
 
             cart.UpdatedAt = DateTime.UtcNow;
@@ -104,24 +104,22 @@ namespace YpsiMarketXPrint.API.Controllers
         }
 
         // PUT api/cart/items/1
-        [HttpPut("items/{productId}")]
-        public async Task<IActionResult> UpdateItem(int productId, UpdateCartItemDto dto)
+        [HttpPut("items/{variantId}")]
+        public async Task<IActionResult> UpdateItem(int variantId, UpdateCartItemDto dto)
         {
             var userId = GetUserId();
             var cart = await _context.Carts.FirstOrDefaultAsync(c => c.UserId == userId);
-            if (cart == null) return NotFound("Cart not found.");
+            if (cart == null)
+                return NotFound("Cart not found.");
 
-            var item = await _context.CartItems.FindAsync(cart.CartId, productId);
-            if (item == null) return NotFound("Item not found in cart.");
+            var item = await _context.CartItems.FindAsync(cart.CartId, variantId);
+            if (item == null)
+                return NotFound("Item not found in cart.");
 
             if (dto.Quantity <= 0)
-            {
                 _context.CartItems.Remove(item);
-            }
             else
-            {
                 item.Quantity = dto.Quantity;
-            }
 
             cart.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
@@ -129,15 +127,17 @@ namespace YpsiMarketXPrint.API.Controllers
         }
 
         // DELETE api/cart/items/1
-        [HttpDelete("items/{productId}")]
-        public async Task<IActionResult> RemoveItem(int productId)
+        [HttpDelete("items/{variantId}")]
+        public async Task<IActionResult> RemoveItem(int variantId)
         {
             var userId = GetUserId();
             var cart = await _context.Carts.FirstOrDefaultAsync(c => c.UserId == userId);
-            if (cart == null) return NotFound("Cart not found.");
+            if (cart == null)
+                return NotFound("Cart not found.");
 
-            var item = await _context.CartItems.FindAsync(cart.CartId, productId);
-            if (item == null) return NotFound("Item not found in cart.");
+            var item = await _context.CartItems.FindAsync(cart.CartId, variantId);
+            if (item == null)
+                return NotFound("Item not found in cart.");
 
             _context.CartItems.Remove(item);
             cart.UpdatedAt = DateTime.UtcNow;
@@ -150,11 +150,12 @@ namespace YpsiMarketXPrint.API.Controllers
         public async Task<IActionResult> ClearCart()
         {
             var userId = GetUserId();
-            var cart = await _context.Carts
-                .Include(c => c.CartItems)
+            var cart = await _context
+                .Carts.Include(c => c.CartItems)
                 .FirstOrDefaultAsync(c => c.UserId == userId);
 
-            if (cart == null) return NotFound("Cart not found.");
+            if (cart == null)
+                return NotFound("Cart not found.");
 
             _context.CartItems.RemoveRange(cart.CartItems);
             cart.UpdatedAt = DateTime.UtcNow;

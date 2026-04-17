@@ -2,9 +2,10 @@
 {
     public class CartItemDto
     {
+        public int VariantId { get; set; }
         public int ProductId { get; set; }
         public string ProductName { get; set; } = null!;
-        public string ProductSize { get; set; } = null!;
+        public string Size { get; set; } = null!;
         public decimal Price { get; set; }
         public int Quantity { get; set; }
         public decimal Subtotal => Math.Round(Price * Quantity, 2);
@@ -20,7 +21,7 @@
 
     public class AddCartItemDto
     {
-        public int ProductId { get; set; }
+        public int VariantId { get; set; }
         public int Quantity { get; set; }
     }
 

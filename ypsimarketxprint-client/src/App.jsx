@@ -17,7 +17,9 @@ import AdminProducts from './pages/admin/AdminProducts'
 import AdminOrders from './pages/admin/AdminOrders'
 
 function ProtectedRoute({ children, adminOnly = false }) {
-  const { user } = useAuth()
+  const { user, authLoading } = useAuth()
+  
+  if (authLoading) return null
   if (!user) return <Navigate to="/login" />
   if (adminOnly && user.userType !== 'admin') return <Navigate to="/" />
   return children

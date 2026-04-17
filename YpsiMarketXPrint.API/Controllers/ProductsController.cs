@@ -22,21 +22,37 @@ namespace YpsiMarketXPrint.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            var products = await _context.Products
-                .Include(p => p.ProductType)
+            var products = await _context
+                .Products.Include(p => p.ProductType)
+                .Include(p => p.Variants)
                 .Include(p => p.ProductPictures)
                     .ThenInclude(pp => pp.Picture)
                 .Select(p => new ProductDto
                 {
                     ProductId = p.ProductId,
                     ProductName = p.ProductName,
+                    Description = p.Description,
                     ProductType = p.ProductType.TypeName,
-                    ProductSize = p.ProductSize,
-                    Price = p.Price,
-                    PrimaryImageLink = p.ProductPictures
-                        .Where(pp => pp.IsPrimary)
+                    PrimaryImageLink = p
+                        .ProductPictures.Where(pp => pp.IsPrimary)
                         .Select(pp => pp.Picture.Link)
-                        .FirstOrDefault()
+                        .FirstOrDefault(),
+                    Variants = p
+                        .Variants.Select(v => new ProductVariantDto
+                        {
+                            VariantId = v.VariantId,
+                            Size = v.Size,
+                            Price = v.Price,
+                        })
+                        .ToList(),
+                    Pictures = p
+                        .ProductPictures.Select(pp => new ProductPictureDto
+                        {
+                            PictureId = pp.PictureId,
+                            Link = pp.Picture.Link,
+                            IsPrimary = pp.IsPrimary,
+                        })
+                        .ToList(),
                 })
                 .ToListAsync();
 
@@ -47,8 +63,8 @@ namespace YpsiMarketXPrint.API.Controllers
         [HttpGet("types")]
         public async Task<IActionResult> GetTypes()
         {
-            var types = await _context.ProductTypes
-                .OrderBy(t => t.TypeName)
+            var types = await _context
+                .ProductTypes.OrderBy(t => t.TypeName)
                 .Select(t => new { t.ProductTypeId, t.TypeName })
                 .ToListAsync();
 
@@ -59,25 +75,42 @@ namespace YpsiMarketXPrint.API.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var product = await _context.Products
-                .Include(p => p.ProductType)
+            var product = await _context
+                .Products.Include(p => p.ProductType)
+                .Include(p => p.Variants)
                 .Include(p => p.ProductPictures)
                     .ThenInclude(pp => pp.Picture)
                 .FirstOrDefaultAsync(p => p.ProductId == id);
 
-            if (product == null) return NotFound();
+            if (product == null)
+                return NotFound();
 
             var dto = new ProductDto
             {
                 ProductId = product.ProductId,
                 ProductName = product.ProductName,
+                Description = product.Description,
                 ProductType = product.ProductType.TypeName,
-                ProductSize = product.ProductSize,
-                Price = product.Price,
-                PrimaryImageLink = product.ProductPictures
-                    .Where(pp => pp.IsPrimary)
+                PrimaryImageLink = product
+                    .ProductPictures.Where(pp => pp.IsPrimary)
                     .Select(pp => pp.Picture.Link)
-                    .FirstOrDefault()
+                    .FirstOrDefault(),
+                Variants = product
+                    .Variants.Select(v => new ProductVariantDto
+                    {
+                        VariantId = v.VariantId,
+                        Size = v.Size,
+                        Price = v.Price,
+                    })
+                    .ToList(),
+                Pictures = product
+                    .ProductPictures.Select(pp => new ProductPictureDto
+                    {
+                        PictureId = pp.PictureId,
+                        Link = pp.Picture.Link,
+                        IsPrimary = pp.IsPrimary,
+                    })
+                    .ToList(),
             };
 
             return Ok(dto);
@@ -89,20 +122,20 @@ namespace YpsiMarketXPrint.API.Controllers
         public async Task<IActionResult> Create(CreateProductDto dto)
         {
             var productType = await _context.ProductTypes.FindAsync(dto.ProductTypeId);
-            if (productType == null) return BadRequest("Invalid product type.");
+            if (productType == null)
+                return BadRequest("Invalid product type.");
 
             var product = new Product
             {
                 ProductName = dto.ProductName,
+                Description = dto.Description,
                 ProductTypeId = dto.ProductTypeId,
-                ProductSize = dto.ProductSize,
-                Price = dto.Price
             };
 
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetById), new { id = product.ProductId }, product);
+            return Ok(new { product.ProductId, product.ProductName });
         }
 
         // PUT api/products/1 - admin only
@@ -111,20 +144,23 @@ namespace YpsiMarketXPrint.API.Controllers
         public async Task<IActionResult> Update(int id, UpdateProductDto dto)
         {
             var product = await _context.Products.FindAsync(id);
-            if (product == null) return NotFound();
+            if (product == null)
+                return NotFound();
 
-            if (dto.ProductName != null) product.ProductName = dto.ProductName;
-            if (dto.ProductSize != null) product.ProductSize = dto.ProductSize;
-            if (dto.Price.HasValue) product.Price = dto.Price.Value;
+            if (dto.ProductName != null)
+                product.ProductName = dto.ProductName;
+            if (dto.Description != null)
+                product.Description = dto.Description;
             if (dto.ProductTypeId.HasValue)
             {
                 var productType = await _context.ProductTypes.FindAsync(dto.ProductTypeId.Value);
-                if (productType == null) return BadRequest("Invalid product type.");
+                if (productType == null)
+                    return BadRequest("Invalid product type.");
                 product.ProductTypeId = dto.ProductTypeId.Value;
             }
 
             await _context.SaveChangesAsync();
-            return Ok(product);
+            return Ok(new { product.ProductId, product.ProductName });
         }
 
         // DELETE api/products/1 - admin only
@@ -133,9 +169,78 @@ namespace YpsiMarketXPrint.API.Controllers
         public async Task<IActionResult> Delete(int id)
         {
             var product = await _context.Products.FindAsync(id);
-            if (product == null) return NotFound();
+            if (product == null)
+                return NotFound();
 
             _context.Products.Remove(product);
+            await _context.SaveChangesAsync();
+            return NoContent();
+        }
+
+        // POST api/products/1/variants - admin only
+        [HttpPost("{id}/variants")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> AddVariant(int id, CreateVariantDto dto)
+        {
+            var product = await _context.Products.FindAsync(id);
+            if (product == null)
+                return NotFound();
+
+            var variant = new ProductVariant
+            {
+                ProductId = id,
+                Size = dto.Size,
+                Price = dto.Price,
+            };
+
+            _context.ProductVariants.Add(variant);
+            await _context.SaveChangesAsync();
+
+            return Ok(
+                new ProductVariantDto
+                {
+                    VariantId = variant.VariantId,
+                    Size = variant.Size,
+                    Price = variant.Price,
+                }
+            );
+        }
+
+        // PUT api/products/variants/1 - admin only
+        [HttpPut("variants/{variantId}")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> UpdateVariant(int variantId, UpdateVariantDto dto)
+        {
+            var variant = await _context.ProductVariants.FindAsync(variantId);
+            if (variant == null)
+                return NotFound();
+
+            if (dto.Size != null)
+                variant.Size = dto.Size;
+            if (dto.Price.HasValue)
+                variant.Price = dto.Price.Value;
+
+            await _context.SaveChangesAsync();
+            return Ok(
+                new ProductVariantDto
+                {
+                    VariantId = variant.VariantId,
+                    Size = variant.Size,
+                    Price = variant.Price,
+                }
+            );
+        }
+
+        // DELETE api/products/variants/1 - admin only
+        [HttpDelete("variants/{variantId}")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> DeleteVariant(int variantId)
+        {
+            var variant = await _context.ProductVariants.FindAsync(variantId);
+            if (variant == null)
+                return NotFound();
+
+            _context.ProductVariants.Remove(variant);
             await _context.SaveChangesAsync();
             return NoContent();
         }

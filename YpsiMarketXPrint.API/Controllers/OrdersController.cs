@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
 using YpsiMarketXPrint.API.Data;
 using YpsiMarketXPrint.API.DTOs;
 using YpsiMarketXPrint.API.Models;
@@ -20,18 +20,17 @@ namespace YpsiMarketXPrint.API.Controllers
             _context = context;
         }
 
-        private int GetUserId() =>
-            int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        private int GetUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
-        // POST api/orders/checkout - converts cart to order
+        // POST api/orders/checkout
         [HttpPost("checkout")]
         public async Task<IActionResult> Checkout()
         {
             var userId = GetUserId();
 
-            var cart = await _context.Carts
-                .Include(c => c.CartItems)
-                    .ThenInclude(ci => ci.Product)
+            var cart = await _context
+                .Carts.Include(c => c.CartItems)
+                    .ThenInclude(ci => ci.Variant)
                 .FirstOrDefaultAsync(c => c.UserId == userId);
 
             if (cart == null || !cart.CartItems.Any())
@@ -41,19 +40,21 @@ namespace YpsiMarketXPrint.API.Controllers
             {
                 UserId = userId,
                 DateOrdered = DateTime.UtcNow,
-                OrderStatus = "pending"
+                OrderStatus = "pending",
             };
 
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
 
-            var orderItems = cart.CartItems.Select(ci => new OrderItem
-            {
-                OrderId = order.OrderId,
-                ProductId = ci.ProductId,
-                Quantity = ci.Quantity,
-                UnitPrice = ci.Product.Price
-            }).ToList();
+            var orderItems = cart
+                .CartItems.Select(ci => new OrderItem
+                {
+                    OrderId = order.OrderId,
+                    VariantId = ci.VariantId,
+                    Quantity = ci.Quantity,
+                    UnitPrice = ci.Variant.Price,
+                })
+                .ToList();
 
             _context.OrderItems.AddRange(orderItems);
             _context.CartItems.RemoveRange(cart.CartItems);
@@ -64,30 +65,34 @@ namespace YpsiMarketXPrint.API.Controllers
             return Ok(new { message = "Order placed successfully.", orderId = order.OrderId });
         }
 
-        // GET api/orders - get current user's orders
+        // GET api/orders
         [HttpGet]
         public async Task<IActionResult> GetMyOrders()
         {
             var userId = GetUserId();
 
-            var orders = await _context.Orders
-                .Where(o => o.UserId == userId)
+            var orders = await _context
+                .Orders.Where(o => o.UserId == userId)
                 .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Product)
+                    .ThenInclude(oi => oi.Variant)
+                        .ThenInclude(v => v.Product)
                 .OrderByDescending(o => o.DateOrdered)
                 .Select(o => new OrderDto
                 {
                     OrderId = o.OrderId,
                     DateOrdered = o.DateOrdered,
                     OrderStatus = o.OrderStatus,
-                    Items = o.OrderItems.Select(oi => new OrderItemDto
-                    {
-                        ProductId = oi.ProductId,
-                        ProductName = oi.Product.ProductName,
-                        ProductSize = oi.Product.ProductSize,
-                        Quantity = oi.Quantity,
-                        UnitPrice = oi.UnitPrice
-                    }).ToList()
+                    Items = o
+                        .OrderItems.Select(oi => new OrderItemDto
+                        {
+                            VariantId = oi.VariantId,
+                            ProductId = oi.Variant.ProductId,
+                            ProductName = oi.Variant.Product.ProductName,
+                            Size = oi.Variant.Size,
+                            Quantity = oi.Quantity,
+                            UnitPrice = oi.UnitPrice,
+                        })
+                        .ToList(),
                 })
                 .ToListAsync();
 
@@ -100,14 +105,15 @@ namespace YpsiMarketXPrint.API.Controllers
         {
             var userId = GetUserId();
 
-            var order = await _context.Orders
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Product)
+            var order = await _context
+                .Orders.Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Variant)
+                        .ThenInclude(v => v.Product)
                 .FirstOrDefaultAsync(o => o.OrderId == id);
 
-            if (order == null) return NotFound();
+            if (order == null)
+                return NotFound();
 
-            // customers can only see their own orders
             if (order.UserId != userId && !User.IsInRole("admin") && !User.IsInRole("staff"))
                 return Forbid();
 
@@ -116,14 +122,17 @@ namespace YpsiMarketXPrint.API.Controllers
                 OrderId = order.OrderId,
                 DateOrdered = order.DateOrdered,
                 OrderStatus = order.OrderStatus,
-                Items = order.OrderItems.Select(oi => new OrderItemDto
-                {
-                    ProductId = oi.ProductId,
-                    ProductName = oi.Product.ProductName,
-                    ProductSize = oi.Product.ProductSize,
-                    Quantity = oi.Quantity,
-                    UnitPrice = oi.UnitPrice
-                }).ToList()
+                Items = order
+                    .OrderItems.Select(oi => new OrderItemDto
+                    {
+                        VariantId = oi.VariantId,
+                        ProductId = oi.Variant.ProductId,
+                        ProductName = oi.Variant.Product.ProductName,
+                        Size = oi.Variant.Size,
+                        Quantity = oi.Quantity,
+                        UnitPrice = oi.UnitPrice,
+                    })
+                    .ToList(),
             };
 
             return Ok(dto);
@@ -134,23 +143,27 @@ namespace YpsiMarketXPrint.API.Controllers
         [Authorize(Roles = "admin,staff")]
         public async Task<IActionResult> GetAllOrders()
         {
-            var orders = await _context.Orders
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Product)
+            var orders = await _context
+                .Orders.Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Variant)
+                        .ThenInclude(v => v.Product)
                 .OrderByDescending(o => o.DateOrdered)
                 .Select(o => new OrderDto
                 {
                     OrderId = o.OrderId,
                     DateOrdered = o.DateOrdered,
                     OrderStatus = o.OrderStatus,
-                    Items = o.OrderItems.Select(oi => new OrderItemDto
-                    {
-                        ProductId = oi.ProductId,
-                        ProductName = oi.Product.ProductName,
-                        ProductSize = oi.Product.ProductSize,
-                        Quantity = oi.Quantity,
-                        UnitPrice = oi.UnitPrice
-                    }).ToList()
+                    Items = o
+                        .OrderItems.Select(oi => new OrderItemDto
+                        {
+                            VariantId = oi.VariantId,
+                            ProductId = oi.Variant.ProductId,
+                            ProductName = oi.Variant.Product.ProductName,
+                            Size = oi.Variant.Size,
+                            Quantity = oi.Quantity,
+                            UnitPrice = oi.UnitPrice,
+                        })
+                        .ToList(),
                 })
                 .ToListAsync();
 
@@ -162,17 +175,32 @@ namespace YpsiMarketXPrint.API.Controllers
         [Authorize(Roles = "admin,staff")]
         public async Task<IActionResult> UpdateStatus(int id, UpdateOrderStatusDto dto)
         {
-            var validStatuses = new[] { "pending", "processing", "shipped", "delivered", "cancelled" };
+            var validStatuses = new[]
+            {
+                "pending",
+                "processing",
+                "shipped",
+                "delivered",
+                "cancelled",
+            };
             if (!validStatuses.Contains(dto.OrderStatus.ToLower()))
                 return BadRequest("Invalid order status.");
 
             var order = await _context.Orders.FindAsync(id);
-            if (order == null) return NotFound();
+            if (order == null)
+                return NotFound();
 
             order.OrderStatus = dto.OrderStatus.ToLower();
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Order status updated.", orderId = order.OrderId, status = order.OrderStatus });
+            return Ok(
+                new
+                {
+                    message = "Order status updated.",
+                    orderId = order.OrderId,
+                    status = order.OrderStatus,
+                }
+            );
         }
     }
 }

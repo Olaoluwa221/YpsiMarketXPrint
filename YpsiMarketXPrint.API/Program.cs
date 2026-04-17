@@ -1,9 +1,9 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
-using System.IdentityModel.Tokens.Jwt;
-using System.Text;
 using YpsiMarketXPrint.API.Data;
 using YpsiMarketXPrint.API.Models;
 
@@ -18,28 +18,37 @@ namespace YpsiMarketXPrint.API
             // Database
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
             builder.Services.AddDbContext<AppDbContext>(options =>
-                options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 45)),
-                    mySqlOptions => mySqlOptions.EnableRetryOnFailure(
-                        maxRetryCount: 10,
-                        maxRetryDelay: TimeSpan.FromSeconds(5),
-                        errorNumbersToAdd: null
-                    )
-                ));
+                options.UseMySql(
+                    connectionString,
+                    new MySqlServerVersion(new Version(8, 0, 45)),
+                    mySqlOptions =>
+                        mySqlOptions.EnableRetryOnFailure(
+                            maxRetryCount: 10,
+                            maxRetryDelay: TimeSpan.FromSeconds(5),
+                            errorNumbersToAdd: null
+                        )
+                )
+            );
 
             // Allow requests from the React frontend during development
             builder.Services.AddCors(options =>
             {
-                options.AddPolicy("AllowFrontend", policy =>
-                {
-                    policy.WithOrigins("http://localhost:5173")
-                          .AllowAnyHeader()
-                          .AllowAnyMethod();
-                });
+                options.AddPolicy(
+                    "AllowFrontend",
+                    policy =>
+                    {
+                        policy
+                            .WithOrigins("http://localhost:5173")
+                            .AllowAnyHeader()
+                            .AllowAnyMethod();
+                    }
+                );
             });
 
             // JWT Authentication
             JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
-            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            builder
+                .Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
                 {
                     options.TokenValidationParameters = new TokenValidationParameters
@@ -51,7 +60,8 @@ namespace YpsiMarketXPrint.API
                         ValidIssuer = builder.Configuration["Jwt:Issuer"],
                         ValidAudience = builder.Configuration["Jwt:Audience"],
                         IssuerSigningKey = new SymmetricSecurityKey(
-                            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+                            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)
+                        ),
                     };
                 });
 
@@ -68,6 +78,7 @@ namespace YpsiMarketXPrint.API
             }
 
             app.UseHttpsRedirection();
+            app.UseStaticFiles();
             app.UseCors("AllowFrontend");
             app.UseAuthentication();
             app.UseAuthorization();
@@ -88,14 +99,18 @@ namespace YpsiMarketXPrint.API
 
                         if (!db.Users.Any(u => u.UserType == "admin"))
                         {
-                            db.Users.Add(new User
-                            {
-                                FirstName = "Admin",
-                                LastName = "User",
-                                Email = config["Seed:AdminEmail"]!,
-                                PasswordHash = BCrypt.Net.BCrypt.HashPassword(config["Seed:AdminPassword"]!),
-                                UserType = "admin"
-                            });
+                            db.Users.Add(
+                                new User
+                                {
+                                    FirstName = "Admin",
+                                    LastName = "User",
+                                    Email = config["Seed:AdminEmail"]!,
+                                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(
+                                        config["Seed:AdminPassword"]!
+                                    ),
+                                    UserType = "admin",
+                                }
+                            );
                             db.SaveChanges();
                         }
                     }
@@ -104,7 +119,9 @@ namespace YpsiMarketXPrint.API
                 catch (Exception ex)
                 {
                     retries++;
-                    Console.WriteLine($"Migration attempt {retries} failed: {ex.Message}. Retrying in 5s...");
+                    Console.WriteLine(
+                        $"Migration attempt {retries} failed: {ex.Message}. Retrying in 5s..."
+                    );
                     Thread.Sleep(5000);
                 }
             }
