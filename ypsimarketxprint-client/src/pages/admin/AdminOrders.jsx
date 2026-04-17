@@ -97,7 +97,7 @@ export default function AdminOrders() {
                     <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
                     <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
                     <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                    <th className="text-right px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
+                    <th className="text-right px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Update</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -175,7 +175,7 @@ export default function AdminOrders() {
                 </div>
               </div>
 
-              <div className="border-t border-gray-100 pt-4">
+              <div className="border-t border-gray-100 pt-4 mb-6">
                 <h3 className="text-sm font-semibold mb-3" style={{ color: '#1B2A4A' }}>Items</h3>
                 <div className="space-y-3">
                   {selectedOrder.items.map((item, i) => (
@@ -190,7 +190,7 @@ export default function AdminOrders() {
                 </div>
               </div>
 
-              <div className="border-t border-gray-100 pt-4 mt-4">
+              <div className="border-t border-gray-100 pt-4">
                 <h3 className="text-sm font-semibold mb-3" style={{ color: '#1B2A4A' }}>Update status</h3>
                 <div className="grid grid-cols-1 gap-2">
                   {statuses.map(status => (
