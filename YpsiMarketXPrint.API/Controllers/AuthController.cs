@@ -1,10 +1,11 @@
-﻿using BCrypt.Net;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using BCrypt.Net;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 using YpsiMarketXPrint.API.Data;
 using YpsiMarketXPrint.API.DTOs;
 using YpsiMarketXPrint.API.Models;
@@ -36,7 +37,8 @@ namespace YpsiMarketXPrint.API.Controllers
                 LastName = dto.LastName,
                 Email = dto.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-                UserType = "customer"
+                UserType = "customer",
+                MarketingOptIn = dto.MarketingOptIn,
             };
 
             _context.Users.Add(user);
@@ -55,12 +57,53 @@ namespace YpsiMarketXPrint.API.Controllers
 
             var token = GenerateToken(user);
 
-            return Ok(new AuthResponseDto
-            {
-                Token = token,
-                Email = user.Email,
-                UserType = user.UserType
-            });
+            return Ok(
+                new AuthResponseDto
+                {
+                    Token = token,
+                    Email = user.Email,
+                    UserType = user.UserType,
+                }
+            );
+        }
+
+        // PUT api/auth/marketing-opt-in
+        [HttpPut("marketing-opt-in")]
+        [Authorize]
+        public async Task<IActionResult> UpdateMarketingOptIn([FromBody] bool optIn)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+                return NotFound();
+
+            user.MarketingOptIn = optIn;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { marketingOptIn = user.MarketingOptIn });
+        }
+
+        // GET api/auth/me
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<IActionResult> Me()
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+                return NotFound();
+
+            return Ok(
+                new
+                {
+                    user.UserId,
+                    user.FirstName,
+                    user.LastName,
+                    user.Email,
+                    user.UserType,
+                    user.MarketingOptIn,
+                }
+            );
         }
 
         private string GenerateToken(User user)
@@ -69,7 +112,7 @@ namespace YpsiMarketXPrint.API.Controllers
             {
                 new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim("role", user.UserType)
+                new Claim("role", user.UserType),
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));

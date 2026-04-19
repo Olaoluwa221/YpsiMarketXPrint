@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using YpsiMarketXPrint.API.Data;
 using YpsiMarketXPrint.API.DTOs;
 using YpsiMarketXPrint.API.Models;
+using YpsiMarketXPrint.API.Services;
 
 namespace YpsiMarketXPrint.API.Controllers
 {
@@ -14,10 +15,12 @@ namespace YpsiMarketXPrint.API.Controllers
     public class OrdersController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly EmailService? _emailService;
 
-        public OrdersController(AppDbContext context)
+        public OrdersController(AppDbContext context, EmailService? emailService = null)
         {
             _context = context;
+            _emailService = emailService;
         }
 
         private int GetUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
@@ -61,6 +64,25 @@ namespace YpsiMarketXPrint.API.Controllers
             cart.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            // Send confirmation email
+            try
+            {
+                var user = await _context.Users.FindAsync(userId);
+                if (_emailService != null && user != null)
+                {
+                    var total = orderItems.Sum(oi => oi.UnitPrice * oi.Quantity);
+                    await _emailService.SendOrderConfirmationAsync(
+                        user.Email,
+                        order.OrderId,
+                        total
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Email failed: {ex.Message}");
+            }
 
             return Ok(new { message = "Order placed successfully.", orderId = order.OrderId });
         }
@@ -192,6 +214,22 @@ namespace YpsiMarketXPrint.API.Controllers
 
             order.OrderStatus = dto.OrderStatus.ToLower();
             await _context.SaveChangesAsync();
+
+            // Send status update email
+            try
+            {
+                var user = await _context.Users.FindAsync(order.UserId);
+                if (_emailService != null && user != null)
+                    await _emailService.SendOrderStatusUpdateAsync(
+                        user.Email,
+                        order.OrderId,
+                        order.OrderStatus
+                    );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Email failed: {ex.Message}");
+            }
 
             return Ok(
                 new

@@ -3,9 +3,11 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Resend;
 using Scalar.AspNetCore;
 using YpsiMarketXPrint.API.Data;
 using YpsiMarketXPrint.API.Models;
+using YpsiMarketXPrint.API.Services;
 
 namespace YpsiMarketXPrint.API
 {
@@ -69,6 +71,13 @@ namespace YpsiMarketXPrint.API
             builder.Services.AddControllers();
             builder.Services.AddOpenApi();
 
+            // Email service
+            builder.Services.AddHttpClient<IResend, ResendClient>();
+            builder.Services.Configure<ResendClientOptions>(options =>
+            {
+                options.ApiToken = builder.Configuration["Resend:ApiKey"]!;
+            });
+            builder.Services.AddSingleton<EmailService>();
             var app = builder.Build();
 
             if (app.Environment.IsDevelopment())

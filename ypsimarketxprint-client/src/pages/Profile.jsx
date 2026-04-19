@@ -40,6 +40,35 @@ export default function Profile() {
     navigate('/')
   }
 
+  const [marketingOptIn, setMarketingOptIn] = useState(false)
+  const [updatingOptIn, setUpdatingOptIn] = useState(false)
+
+  useEffect(() => {
+    const fetchMe = async () => {
+      try {
+        const res = await api.get('/Auth/me')
+        setMarketingOptIn(res.data.marketingOptIn)
+      } catch {
+        console.error('Failed to fetch user details')
+      }
+    }
+    fetchMe()
+  }, [])
+
+  const handleOptInToggle = async () => {
+    setUpdatingOptIn(true)
+    try {
+      const res = await api.put('/Auth/marketing-opt-in', !marketingOptIn, {
+        headers: { 'Content-Type': 'application/json' }
+      })
+      setMarketingOptIn(res.data.marketingOptIn)
+      showToast(res.data.marketingOptIn ? 'Subscribed to marketing emails' : 'Unsubscribed from marketing emails')
+    } catch {
+      showToast('Failed to update preference', 'error')
+    } finally {
+      setUpdatingOptIn(false)
+    }
+  }
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-6 py-12">
@@ -70,6 +99,49 @@ export default function Profile() {
               <p className="text-xs text-gray-400 mb-1">Account type</p>
               <p className="text-sm font-medium capitalize" style={{ color: '#1B2A4A' }}>{user?.userType}</p>
             </div>
+          </div>
+        </div>
+
+        {/* Marketing preferences */}
+        {/* Email preferences */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-8">
+          <h2 className="text-lg font-bold mb-4" style={{ color: '#1B2A4A' }}>Email preferences</h2>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium" style={{ color: '#1B2A4A' }}>Marketing emails</p>
+              <p className="text-xs text-gray-400 mt-0.5">Receive updates about new products and special offers</p>
+            </div>
+            <button
+              onClick={handleOptInToggle}
+              disabled={updatingOptIn}
+              style={{
+                position: 'relative',
+                width: '52px',
+                height: '28px',
+                borderRadius: '14px',
+                backgroundColor: marketingOptIn ? '#E8620A' : '#D1D5DB',
+                border: 'none',
+                cursor: updatingOptIn ? 'not-allowed' : 'pointer',
+                transition: 'background-color 0.25s ease',
+                padding: 0,
+                flexShrink: 0,
+                opacity: updatingOptIn ? 0.6 : 1,
+              }}
+              aria-label="Toggle marketing emails"
+            >
+              <span style={{
+                position: 'absolute',
+                top: '4px',
+                left: marketingOptIn ? '28px' : '4px',
+                width: '20px',
+                height: '20px',
+                backgroundColor: 'white',
+                borderRadius: '50%',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+                transition: 'left 0.25s ease',
+                display: 'block',
+              }} />
+            </button>
           </div>
         </div>
 

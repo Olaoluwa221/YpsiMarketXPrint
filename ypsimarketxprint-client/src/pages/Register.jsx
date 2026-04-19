@@ -4,7 +4,10 @@ import api from '../api/axios'
 
 export default function Register() {
   const navigate = useNavigate()
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '' })
+  const [form, setForm] = useState({
+    firstName: '', lastName: '', email: '', password: '', confirmPassword: '',
+    marketingOptIn: false
+  })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -22,6 +25,7 @@ export default function Register() {
         lastName: form.lastName,
         email: form.email,
         password: form.password,
+        marketingOptIn: form.marketingOptIn
       })
       navigate('/login')
     } catch (err) {
@@ -116,6 +120,18 @@ export default function Register() {
                 className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2"
                 placeholder="••••••••"
               />
+            </div>
+            <div className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                id="marketingOptIn"
+                checked={form.marketingOptIn}
+                onChange={e => setForm({ ...form, marketingOptIn: e.target.checked })}
+                className="mt-1 w-4 h-4 accent-orange-500"
+              />
+              <label htmlFor="marketingOptIn" className="text-sm text-gray-500">
+                I'd like to receive promotional emails about new products and special offers
+              </label>
             </div>
             <button
               type="submit"

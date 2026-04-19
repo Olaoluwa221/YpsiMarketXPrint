@@ -7,6 +7,7 @@
         public string? LastName { get; set; }
         public string Email { get; set; } = null!;
         public string PasswordHash { get; set; } = null!;
+        public bool MarketingOptIn { get; set; } = false;
         public string UserType { get; set; } = "customer";
 
         public ICollection<Picture> Pictures { get; set; } = [];
