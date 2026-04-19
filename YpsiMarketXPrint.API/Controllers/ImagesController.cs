@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using YpsiMarketXPrint.API.Data;
@@ -13,15 +15,29 @@ namespace YpsiMarketXPrint.API.Controllers
     public class ImagesController : ControllerBase
     {
         private readonly AppDbContext _context;
-        private readonly IWebHostEnvironment _env;
+        private readonly IConfiguration _config;
 
-        public ImagesController(AppDbContext context, IWebHostEnvironment env)
+        public ImagesController(AppDbContext context, IConfiguration config)
         {
             _context = context;
-            _env = env;
+            _config = config;
         }
 
         private int GetUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        private async Task<BlobContainerClient> GetContainerClient()
+        {
+            var connectionString = _config["Azure:StorageConnectionString"];
+            var containerName = _config["Azure:ContainerName"];
+
+            Console.WriteLine($"Connection string: {connectionString}");
+            Console.WriteLine($"Container name: {containerName}");
+
+            var serviceClient = new BlobServiceClient(connectionString);
+            var containerClient = serviceClient.GetBlobContainerClient(containerName);
+            await containerClient.CreateIfNotExistsAsync(PublicAccessType.Blob);
+            return containerClient;
+        }
 
         // POST api/images/upload
         [HttpPost("upload")]
@@ -38,21 +54,22 @@ namespace YpsiMarketXPrint.API.Controllers
             if (file.Length > 5 * 1024 * 1024)
                 return BadRequest("File size cannot exceed 5MB.");
 
-            // Save to wwwroot/images
-            var uploadsFolder = Path.Combine(_env.WebRootPath ?? "wwwroot", "images");
-            Directory.CreateDirectory(uploadsFolder);
-
+            var container = await GetContainerClient();
             var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
-            var filePath = Path.Combine(uploadsFolder, fileName);
+            var blobClient = container.GetBlobClient(fileName);
 
-            using (var stream = new FileStream(filePath, FileMode.Create))
+            using (var stream = file.OpenReadStream())
             {
-                await file.CopyToAsync(stream);
+                await blobClient.UploadAsync(
+                    stream,
+                    new BlobHttpHeaders { ContentType = file.ContentType }
+                );
             }
 
-            var imageUrl = $"{Request.Scheme}://{Request.Host}/images/{fileName}";
+            var imageUrl = blobClient
+                .Uri.ToString()
+                .Replace("http://azurite:10000", "http://localhost:10000");
 
-            // Save to Pictures table
             var picture = new Picture { UploaderId = GetUserId(), Link = imageUrl };
 
             _context.Pictures.Add(picture);
@@ -81,7 +98,6 @@ namespace YpsiMarketXPrint.API.Controllers
             if (existing != null)
                 return BadRequest("Image already assigned to this product.");
 
-            // If setting as primary, unset existing primary
             if (dto.IsPrimary)
             {
                 var currentPrimary = _context
@@ -131,9 +147,24 @@ namespace YpsiMarketXPrint.API.Controllers
             if (pp == null)
                 return NotFound();
 
+            var picture = await _context.Pictures.FindAsync(pictureId);
+            if (picture != null)
+            {
+                try
+                {
+                    var container = await GetContainerClient();
+                    var fileName = Path.GetFileName(new Uri(picture.Link).AbsolutePath);
+                    var blobClient = container.GetBlobClient(fileName);
+                    await blobClient.DeleteIfExistsAsync();
+                }
+                catch { }
+
+                _context.Pictures.Remove(picture);
+            }
+
             _context.ProductPictures.Remove(pp);
             await _context.SaveChangesAsync();
-            return Ok("Image removed from product.");
+            return Ok("Image removed.");
         }
     }
 }
