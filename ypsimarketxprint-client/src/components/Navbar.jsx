@@ -39,6 +39,7 @@ export default function Navbar() {
       <NavItem to="/admin" onClick={closeMenu}>Dashboard</NavItem>
       <NavItem to="/admin/products" onClick={closeMenu}>Products</NavItem>
       <NavItem to="/admin/orders" onClick={closeMenu}>Orders</NavItem>
+      <NavItem to="/admin/emails" onClick={closeMenu}>Emails</NavItem>
     </>
   ) : (
     <>
@@ -49,7 +50,7 @@ export default function Navbar() {
   )
 
   return (
-    <nav style={{ backgroundColor: '#1B2A4A' }} className="px-6 py-4">
+    <nav style={{ backgroundColor: '#1B2A4A' }} className="px-6 py-4 sticky top-0 z-50">
       <div className="flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="text-white font-bold text-lg tracking-wide shrink-0">

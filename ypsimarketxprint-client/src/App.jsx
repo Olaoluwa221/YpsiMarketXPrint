@@ -14,10 +14,11 @@ import Profile from './pages/Profile'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminProducts from './pages/admin/AdminProducts'
 import AdminOrders from './pages/admin/AdminOrders'
+import AdminEmails from './pages/admin/AdminEmails'
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, authLoading } = useAuth()
-  
+
   if (authLoading) return null
   if (!user) return <Navigate to="/login" />
   if (adminOnly && user.userType !== 'admin') return <Navigate to="/" />
@@ -36,9 +37,8 @@ function App() {
           <Route path="/products" element={<Products />} />
           <Route path="/products/:id" element={<ProductDetail />} />
           <Route path="/cart" element={<Cart />} />
-          <Route path="/checkout" element={
-            <ProtectedRoute><Checkout /></ProtectedRoute>
-          } />
+          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/admin/emails" element={<ProtectedRoute><AdminEmails /></ProtectedRoute>} />
           <Route path="/profile" element={
             <ProtectedRoute><Profile /></ProtectedRoute>
           } />

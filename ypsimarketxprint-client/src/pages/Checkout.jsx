@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
+import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 
 export default function Checkout() {
   const { showToast } = useToast()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [cart, setCart] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -26,12 +28,26 @@ export default function Checkout() {
   useEffect(() => {
     const fetchCart = async () => {
       try {
-        const res = await api.get('/Cart')
-        if (!res.data || res.data.items.length === 0) {
-          navigate('/cart')
-          return
+        if (user) {
+          const res = await api.get('/Cart')
+          if (!res.data || res.data.items.length === 0) {
+            navigate('/cart')
+            return
+          }
+          setCart(res.data)
+        } else {
+          const guestCart = localStorage.getItem('guestCart')
+          if (!guestCart) {
+            navigate('/cart')
+            return
+          }
+          const parsed = JSON.parse(guestCart)
+          if (!parsed.items || parsed.items.length === 0) {
+            navigate('/cart')
+            return
+          }
+          setCart(parsed)
         }
-        setCart(res.data)
       } catch {
         navigate('/cart')
       } finally {
@@ -45,7 +61,23 @@ export default function Checkout() {
     e.preventDefault()
     setPlacing(true)
     try {
-      const res = await api.post('/Orders/checkout')
+      let res
+      if (user) {
+        res = await api.post('/Orders/checkout', {
+          guestEmail: null,
+          cartItems: null
+        })
+      } else {
+        res = await api.post('/Orders/checkout', {
+          guestEmail: form.email,
+          cartItems: cart.items.map(item => ({
+            variantId: item.variantId,
+            quantity: item.quantity
+          }))
+        })
+        // Clear guest cart after successful order
+        localStorage.removeItem('guestCart')
+      }
       setConfirmedOrderId(res.data.orderId)
       setShowSuccess(true)
     } catch {
@@ -269,13 +301,15 @@ export default function Checkout() {
               Order <span className="font-semibold" style={{ color: '#1B2A4A' }}>#{confirmedOrderId}</span> has been placed and we'll get started right away.
             </p>
             <div className="flex flex-col gap-3">
-              <button
-                onClick={() => navigate('/profile')}
-                className="w-full py-3 rounded-xl text-sm font-semibold border-2 transition-colors"
-                style={{ color: '#1B2A4A', borderColor: '#1B2A4A' }}
-              >
-                View order history
-              </button>
+              {user && (
+                <button
+                  onClick={() => navigate('/profile')}
+                  className="w-full py-3 rounded-xl text-sm font-semibold border-2 transition-colors"
+                  style={{ color: '#1B2A4A', borderColor: '#1B2A4A' }}
+                >
+                  View order history
+                </button>
+              )}
               <button
                 onClick={() => navigate('/')}
                 style={{ backgroundColor: '#E8620A' }}

@@ -39,16 +39,33 @@ export default function ProductDetail() {
       showToast('Please select a size', 'error')
       return
     }
-    if (!user) {
-      navigate('/login')
-      return
-    }
     setAddingToCart(true)
     try {
-      await api.post('/Cart/items', {
-        variantId: selectedVariant.variantId,
-        quantity
-      })
+      if (user) {
+        await api.post('/Cart/items', {
+          variantId: selectedVariant.variantId,
+          quantity
+        })
+      } else {
+        // Guest cart stored in localStorage
+        const existing = JSON.parse(localStorage.getItem('guestCart') || '{"items":[]}')
+        const itemIndex = existing.items.findIndex(i => i.variantId === selectedVariant.variantId)
+        if (itemIndex >= 0) {
+          existing.items[itemIndex].quantity += quantity
+        } else {
+          existing.items.push({
+            variantId: selectedVariant.variantId,
+            productName: product.productName,
+            size: selectedVariant.size,
+            price: selectedVariant.price,
+            quantity,
+            subtotal: selectedVariant.price * quantity,
+            imageLink: product.primaryImageLink
+          })
+        }
+        existing.total = existing.items.reduce((sum, i) => sum + i.price * i.quantity, 0)
+        localStorage.setItem('guestCart', JSON.stringify(existing))
+      }
       showToast('Added to cart!')
     } catch {
       showToast('Failed to add to cart', 'error')
@@ -98,9 +115,8 @@ export default function ProductDetail() {
                   <button
                     key={pic.pictureId}
                     onClick={() => setSelectedImage(pic.link)}
-                    className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
-                      selectedImage === pic.link ? 'border-orange-500' : 'border-gray-200 hover:border-orange-300'
-                    }`}
+                    className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${selectedImage === pic.link ? 'border-orange-500' : 'border-gray-200 hover:border-orange-300'
+                      }`}
                   >
                     <img src={pic.link} alt="" className="w-full h-full object-cover" />
                   </button>
@@ -141,11 +157,10 @@ export default function ProductDetail() {
                     <button
                       key={variant.variantId}
                       onClick={() => setSelectedVariant(variant)}
-                      className={`px-5 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${
-                        selectedVariant?.variantId === variant.variantId
-                          ? 'text-white border-orange-500'
-                          : 'border-gray-200 text-gray-600 hover:border-orange-400'
-                      }`}
+                      className={`px-5 py-2.5 rounded-xl text-sm font-medium border-2 transition-all ${selectedVariant?.variantId === variant.variantId
+                        ? 'text-white border-orange-500'
+                        : 'border-gray-200 text-gray-600 hover:border-orange-400'
+                        }`}
                       style={selectedVariant?.variantId === variant.variantId ? { backgroundColor: '#E8620A' } : {}}
                     >
                       {variant.size}
@@ -193,14 +208,8 @@ export default function ProductDetail() {
               style={{ backgroundColor: '#E8620A' }}
               className="w-full py-4 rounded-xl text-white font-semibold text-lg hover:opacity-90 disabled:opacity-50 transition-opacity shadow-lg"
             >
-              {addingToCart ? 'Adding...' : !user ? 'Login to add to cart' : 'Add to cart'}
+              {addingToCart ? 'Adding...' : 'Add to cart'}
             </button>
-
-            {!user && (
-              <p className="text-center text-sm text-gray-400 mt-3">
-                You need to be logged in to add items to your cart
-              </p>
-            )}
           </div>
         </div>
       </div>

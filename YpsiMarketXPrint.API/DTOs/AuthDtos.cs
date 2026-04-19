@@ -9,6 +9,12 @@
         public bool MarketingOptIn { get; set; } = false;
     }
 
+    public class SendPromotionalDto
+    {
+        public string Subject { get; set; } = null!;
+        public string HtmlBody { get; set; } = null!;
+    }
+
     public class LoginDto
     {
         public string Email { get; set; } = null!;

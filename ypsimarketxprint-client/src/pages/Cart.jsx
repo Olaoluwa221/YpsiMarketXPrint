@@ -14,6 +14,8 @@ export default function Cart() {
 
   useEffect(() => {
     if (!user) {
+      const guestCart = localStorage.getItem('guestCart')
+      if (guestCart) setCart(JSON.parse(guestCart))
       setLoading(false)
       return
     }
@@ -60,17 +62,6 @@ export default function Cart() {
       showToast('Failed to clear cart', 'error')
     }
   }
-
-  if (!user) return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
-      <div className="text-6xl">🛒</div>
-      <h2 className="text-2xl font-bold" style={{ color: '#1B2A4A' }}>Your cart is waiting</h2>
-      <p className="text-gray-500">Sign in to view your cart</p>
-      <Link to="/login" style={{ backgroundColor: '#E8620A' }} className="px-8 py-3 rounded-xl text-white font-semibold hover:opacity-90 transition-opacity">
-        Sign in
-      </Link>
-    </div>
-  )
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -11,7 +11,6 @@ namespace YpsiMarketXPrint.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
     public class OrdersController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -27,21 +26,42 @@ namespace YpsiMarketXPrint.API.Controllers
 
         // POST api/orders/checkout
         [HttpPost("checkout")]
-        public async Task<IActionResult> Checkout()
+        [AllowAnonymous]
+        public async Task<IActionResult> Checkout([FromBody] GuestCheckoutDto dto)
         {
-            var userId = GetUserId();
+            int? userId = null;
+            string? guestEmail = null;
+            Cart? cart = null;
 
-            var cart = await _context
-                .Carts.Include(c => c.CartItems)
-                    .ThenInclude(ci => ci.Variant)
-                .FirstOrDefaultAsync(c => c.UserId == userId);
+            // Check if user is logged in
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userIdClaim != null)
+            {
+                userId = int.Parse(userIdClaim);
+                cart = await _context
+                    .Carts.Include(c => c.CartItems)
+                        .ThenInclude(ci => ci.Variant)
+                    .FirstOrDefaultAsync(c => c.UserId == userId);
+            }
+            else
+            {
+                // Guest checkout
+                if (string.IsNullOrWhiteSpace(dto?.GuestEmail))
+                    return BadRequest("Email is required for guest checkout.");
+                guestEmail = dto.GuestEmail;
 
-            if (cart == null || !cart.CartItems.Any())
+                // For guests, cart items come from the request
+                if (dto.CartItems == null || !dto.CartItems.Any())
+                    return BadRequest("Your cart is empty.");
+            }
+
+            if (userId != null && (cart == null || !cart.CartItems.Any()))
                 return BadRequest("Your cart is empty.");
 
             var order = new Order
             {
                 UserId = userId,
+                GuestEmail = guestEmail,
                 DateOrdered = DateTime.UtcNow,
                 OrderStatus = "pending",
             };
@@ -49,34 +69,57 @@ namespace YpsiMarketXPrint.API.Controllers
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
 
-            var orderItems = cart
-                .CartItems.Select(ci => new OrderItem
-                {
-                    OrderId = order.OrderId,
-                    VariantId = ci.VariantId,
-                    Quantity = ci.Quantity,
-                    UnitPrice = ci.Variant.Price,
-                })
-                .ToList();
+            List<OrderItem> orderItems;
+
+            if (userId != null && cart != null)
+            {
+                orderItems = cart
+                    .CartItems.Select(ci => new OrderItem
+                    {
+                        OrderId = order.OrderId,
+                        VariantId = ci.VariantId,
+                        Quantity = ci.Quantity,
+                        UnitPrice = ci.Variant.Price,
+                    })
+                    .ToList();
+
+                _context.CartItems.RemoveRange(cart.CartItems);
+                cart.UpdatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                // Guest order items
+                var variantIds = dto!.CartItems!.Select(ci => ci.VariantId).ToList();
+                var variants = await _context
+                    .ProductVariants.Where(v => variantIds.Contains(v.VariantId))
+                    .ToListAsync();
+
+                orderItems = dto
+                    .CartItems.Select(ci =>
+                    {
+                        var variant = variants.First(v => v.VariantId == ci.VariantId);
+                        return new OrderItem
+                        {
+                            OrderId = order.OrderId,
+                            VariantId = ci.VariantId,
+                            Quantity = ci.Quantity,
+                            UnitPrice = variant.Price,
+                        };
+                    })
+                    .ToList();
+            }
 
             _context.OrderItems.AddRange(orderItems);
-            _context.CartItems.RemoveRange(cart.CartItems);
-            cart.UpdatedAt = DateTime.UtcNow;
-
             await _context.SaveChangesAsync();
 
             // Send confirmation email
             try
             {
-                var user = await _context.Users.FindAsync(userId);
-                if (_emailService != null && user != null)
+                var emailTo = guestEmail ?? (await _context.Users.FindAsync(userId))?.Email;
+                if (_emailService != null && emailTo != null)
                 {
                     var total = orderItems.Sum(oi => oi.UnitPrice * oi.Quantity);
-                    await _emailService.SendOrderConfirmationAsync(
-                        user.Email,
-                        order.OrderId,
-                        total
-                    );
+                    await _emailService.SendOrderConfirmationAsync(emailTo, order.OrderId, total);
                 }
             }
             catch (Exception ex)
@@ -89,6 +132,7 @@ namespace YpsiMarketXPrint.API.Controllers
 
         // GET api/orders
         [HttpGet]
+        [Authorize]
         public async Task<IActionResult> GetMyOrders()
         {
             var userId = GetUserId();
@@ -123,6 +167,7 @@ namespace YpsiMarketXPrint.API.Controllers
 
         // GET api/orders/1
         [HttpGet("{id}")]
+        [Authorize]
         public async Task<IActionResult> GetById(int id)
         {
             var userId = GetUserId();

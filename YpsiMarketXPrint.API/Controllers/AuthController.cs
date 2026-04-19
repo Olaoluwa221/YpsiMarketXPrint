@@ -9,6 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using YpsiMarketXPrint.API.Data;
 using YpsiMarketXPrint.API.DTOs;
 using YpsiMarketXPrint.API.Models;
+using YpsiMarketXPrint.API.Services;
 
 namespace YpsiMarketXPrint.API.Controllers
 {
@@ -18,11 +19,17 @@ namespace YpsiMarketXPrint.API.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IConfiguration _config;
+        private readonly EmailService? _emailService;
 
-        public AuthController(AppDbContext context, IConfiguration config)
+        public AuthController(
+            AppDbContext context,
+            IConfiguration config,
+            EmailService? emailService = null
+        )
         {
             _context = context;
             _config = config;
+            _emailService = emailService;
         }
 
         [HttpPost("register")]
@@ -104,6 +111,42 @@ namespace YpsiMarketXPrint.API.Controllers
                     user.MarketingOptIn,
                 }
             );
+        }
+
+        // GET api/auth/opted-in-count
+        [HttpGet("opted-in-count")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> GetOptedInCount()
+        {
+            var count = await _context.Users.CountAsync(u => u.MarketingOptIn);
+            return Ok(new { count });
+        }
+
+        // POST api/auth/send-promotional
+        [HttpPost("send-promotional")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> SendPromotional([FromBody] SendPromotionalDto dto)
+        {
+            if (_emailService == null)
+                return StatusCode(500, "Email service is not configured.");
+
+            var emails = await _context
+                .Users.Where(u => u.MarketingOptIn)
+                .Select(u => u.Email)
+                .ToListAsync();
+
+            if (!emails.Any())
+                return BadRequest("No opted-in users found.");
+
+            try
+            {
+                await _emailService.SendPromotionalEmailAsync(emails, dto.Subject, dto.HtmlBody);
+                return Ok(new { message = $"Emails sent to {emails.Count} subscribers." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Failed to send emails: {ex.Message}");
+            }
         }
 
         private string GenerateToken(User user)

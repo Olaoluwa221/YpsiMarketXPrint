@@ -24,4 +24,16 @@
     {
         public string OrderStatus { get; set; } = null!;
     }
+
+    public class GuestCheckoutDto
+    {
+        public string? GuestEmail { get; set; }
+        public List<GuestCartItemDto>? CartItems { get; set; }
+    }
+
+    public class GuestCartItemDto
+    {
+        public int VariantId { get; set; }
+        public int Quantity { get; set; }
+    }
 }
