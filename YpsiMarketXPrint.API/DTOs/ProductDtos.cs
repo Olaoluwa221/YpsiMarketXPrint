@@ -23,6 +23,7 @@
         public string? PrimaryImageLink { get; set; }
         public List<ProductVariantDto> Variants { get; set; } = [];
         public List<ProductPictureDto> Pictures { get; set; } = [];
+        public bool RequiresArtwork { get; set; }
     }
 
     public class CreateProductDto
@@ -30,6 +31,7 @@
         public string ProductName { get; set; } = null!;
         public string? Description { get; set; }
         public int ProductTypeId { get; set; }
+        public bool RequiresArtwork { get; set; } = false;
     }
 
     public class UpdateProductDto
@@ -37,6 +39,7 @@
         public string? ProductName { get; set; }
         public string? Description { get; set; }
         public int? ProductTypeId { get; set; }
+        public bool? RequiresArtwork { get; set; }
     }
 
     public class CreateVariantDto

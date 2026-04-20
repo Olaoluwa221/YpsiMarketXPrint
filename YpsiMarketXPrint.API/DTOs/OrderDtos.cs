@@ -9,6 +9,7 @@
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
         public decimal Subtotal => Math.Round(UnitPrice * Quantity, 2);
+        public string? ArtworkUrl { get; set; }
     }
 
     public class OrderDto

@@ -38,4 +38,16 @@
         public string Token { get; set; } = null!;
         public string NewPassword { get; set; } = null!;
     }
+
+    public class UpdateProfileDto
+    {
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+    }
+
+    public class UpdatePasswordDto
+    {
+        public string CurrentPassword { get; set; } = null!;
+        public string NewPassword { get; set; } = null!;
+    }
 }

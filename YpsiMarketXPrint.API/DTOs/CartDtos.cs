@@ -10,6 +10,7 @@
         public int Quantity { get; set; }
         public decimal Subtotal => Math.Round(Price * Quantity, 2);
         public string? ImageLink { get; set; }
+        public bool RequiresArtwork { get; set; }
     }
 
     public class CartDto

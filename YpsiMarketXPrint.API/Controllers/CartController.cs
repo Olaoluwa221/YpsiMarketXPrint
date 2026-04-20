@@ -64,6 +64,7 @@ namespace YpsiMarketXPrint.API.Controllers
                         .Variant.Product.ProductPictures.Where(pp => pp.IsPrimary)
                         .Select(pp => pp.Picture.Link)
                         .FirstOrDefault(),
+                    RequiresArtwork = ci.Variant.Product.RequiresArtwork,
                 })
                 .ToListAsync();
 

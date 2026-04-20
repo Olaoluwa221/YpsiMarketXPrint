@@ -220,17 +220,16 @@ namespace YpsiMarketXPrint.API.Controllers
                     OrderId = o.OrderId,
                     DateOrdered = o.DateOrdered,
                     OrderStatus = o.OrderStatus,
-                    Items = o
-                        .OrderItems.Select(oi => new OrderItemDto
-                        {
-                            VariantId = oi.VariantId,
-                            ProductId = oi.Variant.ProductId,
-                            ProductName = oi.Variant.Product.ProductName,
-                            Size = oi.Variant.Size,
-                            Quantity = oi.Quantity,
-                            UnitPrice = oi.UnitPrice,
-                        })
-                        .ToList(),
+                    Items = o.OrderItems.Select(oi => new OrderItemDto
+                    {
+                        VariantId = oi.VariantId,
+                        ProductId = oi.Variant.ProductId,
+                        ProductName = oi.Variant.Product.ProductName,
+                        Size = oi.Variant.Size,
+                        Quantity = oi.Quantity,
+                        UnitPrice = oi.UnitPrice,
+                        ArtworkUrl = oi.ArtworkUrl,
+                    }).ToList(),
                 })
                 .ToListAsync();
 

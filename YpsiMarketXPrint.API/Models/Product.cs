@@ -6,7 +6,7 @@
         public string ProductName { get; set; } = null!;
         public string? Description { get; set; }
         public int ProductTypeId { get; set; }
-
+        public bool RequiresArtwork { get; set; } = false;
         public ProductType ProductType { get; set; } = null!;
         public ICollection<ProductVariant> Variants { get; set; } = [];
         public ICollection<ProductPicture> ProductPictures { get; set; } = [];

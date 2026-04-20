@@ -20,6 +20,12 @@ export default function Profile() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedOrder, setExpandedOrder] = useState(null)
+  const [editingName, setEditingName] = useState(false)
+  const [editingPassword, setEditingPassword] = useState(false)
+  const [nameForm, setNameForm] = useState({ firstName: '', lastName: '' })
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  const [savingName, setSavingName] = useState(false)
+  const [savingPassword, setSavingPassword] = useState(false)
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -48,12 +54,51 @@ export default function Profile() {
       try {
         const res = await api.get('/Auth/me')
         setMarketingOptIn(res.data.marketingOptIn)
+        setNameForm({ firstName: res.data.firstName || '', lastName: res.data.lastName || '' })
       } catch {
         console.error('Failed to fetch user details')
       }
     }
     fetchMe()
   }, [])
+
+  const handleSaveName = async () => {
+    setSavingName(true)
+    try {
+      await api.put('/Auth/update-profile', nameForm)
+      showToast('Name updated!')
+      setEditingName(false)
+    } catch {
+      showToast('Failed to update name', 'error')
+    } finally {
+      setSavingName(false)
+    }
+  }
+
+  const handleSavePassword = async () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      showToast('Passwords do not match', 'error')
+      return
+    }
+    if (passwordForm.newPassword.length < 8) {
+      showToast('Password must be at least 8 characters', 'error')
+      return
+    }
+    setSavingPassword(true)
+    try {
+      await api.put('/Auth/update-password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword
+      })
+      showToast('Password updated!')
+      setEditingPassword(false)
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    } catch {
+      showToast('Current password is incorrect', 'error')
+    } finally {
+      setSavingPassword(false)
+    }
+  }
 
   const handleOptInToggle = async () => {
     setUpdatingOptIn(true)
@@ -89,17 +134,138 @@ export default function Profile() {
 
         {/* Account info card */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-8">
-          <h2 className="text-lg font-bold mb-4" style={{ color: '#1B2A4A' }}>Account details</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-gray-400 mb-1">Email</p>
-              <p className="text-sm font-medium" style={{ color: '#1B2A4A' }}>{user?.email}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400 mb-1">Account type</p>
-              <p className="text-sm font-medium capitalize" style={{ color: '#1B2A4A' }}>{user?.userType}</p>
-            </div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold" style={{ color: '#1B2A4A' }}>Account details</h2>
+            {!editingName && !editingPassword && (
+              <button
+                onClick={() => setEditingName(true)}
+                className="text-sm font-medium hover:opacity-80 transition-opacity"
+                style={{ color: '#E8620A' }}
+              >
+                Edit name
+              </button>
+            )}
           </div>
+
+          {editingName ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#1B2A4A' }}>First name</label>
+                  <input
+                    type="text" value={nameForm.firstName}
+                    onChange={e => setNameForm({ ...nameForm, firstName: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#1B2A4A' }}>Last name</label>
+                  <input
+                    type="text" value={nameForm.lastName}
+                    onChange={e => setNameForm({ ...nameForm, lastName: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSaveName}
+                  disabled={savingName}
+                  style={{ backgroundColor: '#E8620A' }}
+                  className="px-5 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+                >
+                  {savingName ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => setEditingName(false)}
+                  className="px-5 py-2 rounded-xl text-sm font-medium border border-gray-200 text-gray-600 hover:border-gray-400 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-xs text-gray-400 mb-1">First name</p>
+                <p className="text-sm font-medium" style={{ color: '#1B2A4A' }}>{nameForm.firstName || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Last name</p>
+                <p className="text-sm font-medium" style={{ color: '#1B2A4A' }}>{nameForm.lastName || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Email</p>
+                <p className="text-sm font-medium" style={{ color: '#1B2A4A' }}>{user?.email}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Account type</p>
+                <p className="text-sm font-medium capitalize" style={{ color: '#1B2A4A' }}>{user?.userType}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Change password */}
+          {!editingName && (
+            <div className="border-t border-gray-100 pt-4 mt-4">
+              {editingPassword ? (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold" style={{ color: '#1B2A4A' }}>Change password</h3>
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ color: '#1B2A4A' }}>Current password</label>
+                    <input
+                      type="password" value={passwordForm.currentPassword}
+                      onChange={e => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ color: '#1B2A4A' }}>New password</label>
+                    <input
+                      type="password" value={passwordForm.newPassword}
+                      onChange={e => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ color: '#1B2A4A' }}>Confirm new password</label>
+                    <input
+                      type="password" value={passwordForm.confirmPassword}
+                      onChange={e => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleSavePassword}
+                      disabled={savingPassword}
+                      style={{ backgroundColor: '#E8620A' }}
+                      className="px-5 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+                    >
+                      {savingPassword ? 'Saving...' : 'Update password'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingPassword(false)
+                        setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+                      }}
+                      className="px-5 py-2 rounded-xl text-sm font-medium border border-gray-200 text-gray-600 hover:border-gray-400 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setEditingPassword(true)}
+                  className="text-sm font-medium hover:opacity-80 transition-opacity"
+                  style={{ color: '#E8620A' }}
+                >
+                  Change password
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Marketing preferences */}

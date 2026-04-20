@@ -3,6 +3,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using YpsiMarketXPrint.API.Data;
 using YpsiMarketXPrint.API.DTOs;
 using YpsiMarketXPrint.API.Models;
@@ -29,9 +30,6 @@ namespace YpsiMarketXPrint.API.Controllers
         {
             var connectionString = _config["Azure:StorageConnectionString"];
             var containerName = _config["Azure:ContainerName"];
-
-            Console.WriteLine($"Connection string: {connectionString}");
-            Console.WriteLine($"Container name: {containerName}");
 
             var serviceClient = new BlobServiceClient(connectionString);
             var containerClient = serviceClient.GetBlobContainerClient(containerName);
@@ -60,18 +58,13 @@ namespace YpsiMarketXPrint.API.Controllers
 
             using (var stream = file.OpenReadStream())
             {
-                await blobClient.UploadAsync(
-                    stream,
-                    new BlobHttpHeaders { ContentType = file.ContentType }
-                );
+                await blobClient.UploadAsync(stream, new BlobHttpHeaders { ContentType = file.ContentType });
             }
 
-            var imageUrl = blobClient
-                .Uri.ToString()
+            var imageUrl = blobClient.Uri.ToString()
                 .Replace("http://azurite:10000", "http://localhost:10000");
 
             var picture = new Picture { UploaderId = GetUserId(), Link = imageUrl };
-
             _context.Pictures.Add(picture);
             await _context.SaveChangesAsync();
 
@@ -81,10 +74,7 @@ namespace YpsiMarketXPrint.API.Controllers
         // POST api/images/products/{productId}/assign
         [HttpPost("products/{productId}/assign")]
         [Authorize(Roles = "admin")]
-        public async Task<IActionResult> AssignToProduct(
-            int productId,
-            [FromBody] AssignImageDto dto
-        )
+        public async Task<IActionResult> AssignToProduct(int productId, [FromBody] AssignImageDto dto)
         {
             var product = await _context.Products.FindAsync(productId);
             if (product == null)
@@ -100,20 +90,18 @@ namespace YpsiMarketXPrint.API.Controllers
 
             if (dto.IsPrimary)
             {
-                var currentPrimary = _context
-                    .ProductPictures.Where(pp => pp.ProductId == productId && pp.IsPrimary)
+                var currentPrimary = _context.ProductPictures
+                    .Where(pp => pp.ProductId == productId && pp.IsPrimary)
                     .ToList();
                 currentPrimary.ForEach(pp => pp.IsPrimary = false);
             }
 
-            _context.ProductPictures.Add(
-                new ProductPicture
-                {
-                    ProductId = productId,
-                    PictureId = dto.PictureId,
-                    IsPrimary = dto.IsPrimary,
-                }
-            );
+            _context.ProductPictures.Add(new ProductPicture
+            {
+                ProductId = productId,
+                PictureId = dto.PictureId,
+                IsPrimary = dto.IsPrimary,
+            });
 
             await _context.SaveChangesAsync();
             return Ok("Image assigned to product.");
@@ -124,8 +112,8 @@ namespace YpsiMarketXPrint.API.Controllers
         [Authorize(Roles = "admin")]
         public async Task<IActionResult> SetPrimary(int productId, int pictureId)
         {
-            var currentPrimaries = _context
-                .ProductPictures.Where(pp => pp.ProductId == productId && pp.IsPrimary)
+            var currentPrimaries = _context.ProductPictures
+                .Where(pp => pp.ProductId == productId && pp.IsPrimary)
                 .ToList();
             currentPrimaries.ForEach(pp => pp.IsPrimary = false);
 
@@ -136,6 +124,99 @@ namespace YpsiMarketXPrint.API.Controllers
             target.IsPrimary = true;
             await _context.SaveChangesAsync();
             return Ok("Primary image updated.");
+        }
+
+        private string GenerateArtworkSasUrl(string blobUrl)
+        {
+            var connectionString = _config["Azure:StorageConnectionString"]!;
+            var containerName = "customer-artwork";
+
+            var fileName = Path.GetFileName(new Uri(blobUrl).AbsolutePath);
+
+            var serviceClient = new BlobServiceClient(connectionString);
+            var containerClient = serviceClient.GetBlobContainerClient(containerName);
+            var blobClient = containerClient.GetBlobClient(fileName);
+
+            var sasBuilder = new Azure.Storage.Sas.BlobSasBuilder
+            {
+                BlobContainerName = containerName,
+                BlobName = fileName,
+                Resource = "b",
+                ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
+            };
+            sasBuilder.SetPermissions(Azure.Storage.Sas.BlobSasPermissions.Read);
+
+            return blobClient.GenerateSasUri(sasBuilder).ToString()
+                .Replace("http://azurite:10000", "http://localhost:10000");
+        }
+
+        // GET api/images/orders/{orderId}/artwork/{variantId}/url
+        [HttpGet("orders/{orderId}/artwork/{variantId}/url")]
+        [Authorize(Roles = "admin,staff")]
+        public async Task<IActionResult> GetArtworkUrl(int orderId, int variantId)
+        {
+            var orderItem = await _context.OrderItems
+                .FirstOrDefaultAsync(oi => oi.OrderId == orderId && oi.VariantId == variantId);
+
+            if (orderItem == null || orderItem.ArtworkUrl == null)
+                return NotFound("No artwork found for this order item.");
+
+            try
+            {
+                var sasUrl = GenerateArtworkSasUrl(orderItem.ArtworkUrl);
+                return Ok(new { url = sasUrl });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Failed to generate artwork URL: {ex.Message}");
+            }
+        }
+
+        // POST api/images/orders/{orderId}/artwork/{variantId}
+        [HttpPost("orders/{orderId}/artwork/{variantId}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> UploadArtwork(int orderId, int variantId, IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("No file provided.");
+
+            if (file.Length > 20 * 1024 * 1024)
+                return BadRequest("File size cannot exceed 20MB.");
+
+            var allowedTypes = new[] {
+                "image/jpeg", "image/png", "image/webp", "image/gif",
+                "application/pdf"
+            };
+            if (!allowedTypes.Contains(file.ContentType.ToLower()))
+                return BadRequest("Only JPEG, PNG, WebP, GIF and PDF files are allowed.");
+
+            var orderItem = await _context.OrderItems
+                .Include(oi => oi.Order)
+                .FirstOrDefaultAsync(oi => oi.OrderId == orderId && oi.VariantId == variantId);
+
+            if (orderItem == null)
+                return NotFound("Order item not found.");
+
+            var connectionString = _config["Azure:StorageConnectionString"]!;
+            var serviceClient = new BlobServiceClient(connectionString);
+            var containerClient = serviceClient.GetBlobContainerClient("customer-artwork");
+            await containerClient.CreateIfNotExistsAsync(PublicAccessType.None);
+
+            var fileName = $"order-{orderId}-variant-{variantId}-{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
+            var blobClient = containerClient.GetBlobClient(fileName);
+
+            using (var stream = file.OpenReadStream())
+            {
+                await blobClient.UploadAsync(stream, new BlobHttpHeaders { ContentType = file.ContentType });
+            }
+
+            var artworkUrl = blobClient.Uri.ToString()
+                .Replace("http://azurite:10000", "http://localhost:10000");
+
+            orderItem.ArtworkUrl = artworkUrl;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { artworkUrl });
         }
 
         // DELETE api/images/products/{productId}/pictures/{pictureId}

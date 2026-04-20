@@ -33,6 +33,7 @@ namespace YpsiMarketXPrint.API.Controllers
                     ProductName = p.ProductName,
                     Description = p.Description,
                     ProductType = p.ProductType.TypeName,
+                    RequiresArtwork = p.RequiresArtwork,
                     PrimaryImageLink = p
                         .ProductPictures.Where(pp => pp.IsPrimary)
                         .Select(pp => pp.Picture.Link)
@@ -91,6 +92,7 @@ namespace YpsiMarketXPrint.API.Controllers
                 ProductName = product.ProductName,
                 Description = product.Description,
                 ProductType = product.ProductType.TypeName,
+                RequiresArtwork = product.RequiresArtwork,
                 PrimaryImageLink = product
                     .ProductPictures.Where(pp => pp.IsPrimary)
                     .Select(pp => pp.Picture.Link)
@@ -130,6 +132,7 @@ namespace YpsiMarketXPrint.API.Controllers
                 ProductName = dto.ProductName,
                 Description = dto.Description,
                 ProductTypeId = dto.ProductTypeId,
+                RequiresArtwork = dto.RequiresArtwork,
             };
 
             _context.Products.Add(product);
@@ -151,6 +154,8 @@ namespace YpsiMarketXPrint.API.Controllers
                 product.ProductName = dto.ProductName;
             if (dto.Description != null)
                 product.Description = dto.Description;
+            if (dto.RequiresArtwork.HasValue)
+                product.RequiresArtwork = dto.RequiresArtwork.Value;
             if (dto.ProductTypeId.HasValue)
             {
                 var productType = await _context.ProductTypes.FindAsync(dto.ProductTypeId.Value);

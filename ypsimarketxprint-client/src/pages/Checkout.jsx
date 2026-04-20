@@ -5,6 +5,7 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import ArtworkUploader from '../components/ArtworkUploader'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -78,17 +79,15 @@ function CheckoutForm({ cart, user }) {
               <h2 className="text-lg font-bold mb-4" style={{ color: '#1B2A4A' }}>Delivery method</h2>
               <div className="grid grid-cols-2 gap-4">
                 <button type="button" onClick={() => setDeliveryMethod('shipping')}
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${
-                    deliveryMethod === 'shipping' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-300'
-                  }`}>
+                  className={`p-4 rounded-xl border-2 text-left transition-all ${deliveryMethod === 'shipping' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-300'
+                    }`}>
                   <div className="text-2xl mb-2">🚚</div>
                   <div className="font-semibold text-sm" style={{ color: '#1B2A4A' }}>Shipping</div>
                   <div className="text-xs text-gray-400 mt-0.5">Delivered to your door</div>
                 </button>
                 <button type="button" onClick={() => setDeliveryMethod('pickup')}
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${
-                    deliveryMethod === 'pickup' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-300'
-                  }`}>
+                  className={`p-4 rounded-xl border-2 text-left transition-all ${deliveryMethod === 'pickup' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-300'
+                    }`}>
                   <div className="text-2xl mb-2">🏪</div>
                   <div className="font-semibold text-sm" style={{ color: '#1B2A4A' }}>Pickup</div>
                   <div className="text-xs text-gray-400 mt-0.5">Pick up in store</div>
@@ -223,7 +222,6 @@ function CheckoutForm({ cart, user }) {
         </div>
       </form>
 
-      {/* Success Modal */}
       {showSuccess && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl text-center">
@@ -231,9 +229,25 @@ function CheckoutForm({ cart, user }) {
               style={{ backgroundColor: '#E8620A' }}>✓</div>
             <h2 className="text-2xl font-bold mb-2" style={{ color: '#1B2A4A' }}>Order confirmed!</h2>
             <p className="text-gray-500 mb-2">Thank you for your order.</p>
-            <p className="text-sm text-gray-400 mb-8">
-              Order <span className="font-semibold" style={{ color: '#1B2A4A' }}>#{confirmedOrderId}</span> has been placed and we'll get started right away.
+            <p className="text-sm text-gray-400 mb-6">
+              Order <span className="font-semibold" style={{ color: '#1B2A4A' }}>#{confirmedOrderId}</span> has been placed.
             </p>
+
+            {/* Artwork upload for items that need it */}
+            {cart?.items?.some(i => i.requiresArtwork) && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6 text-left">
+                <p className="text-sm font-semibold mb-3" style={{ color: '#1B2A4A' }}>📎 Upload your artwork</p>
+                {cart.items.filter(i => i.requiresArtwork).map(item => (
+                  <ArtworkUploader
+                    key={item.variantId}
+                    orderId={confirmedOrderId}
+                    variantId={item.variantId}
+                    productName={item.productName}
+                  />
+                ))}
+              </div>
+            )}
+
             <div className="flex flex-col gap-3">
               {user && (
                 <button onClick={() => navigate('/profile')}

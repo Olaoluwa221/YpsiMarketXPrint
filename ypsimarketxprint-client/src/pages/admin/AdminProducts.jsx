@@ -15,7 +15,7 @@ export default function AdminProducts() {
   const [editingVariant, setEditingVariant] = useState(null)
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [newTypeName, setNewTypeName] = useState('')
-  const [productForm, setProductForm] = useState({ productName: '', description: '', productTypeId: '' })
+  const [productForm, setProductForm] = useState({ productName: '', description: '', productTypeId: '', requiresArtwork: false })
   const [variantForm, setVariantForm] = useState({ size: '', price: '' })
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
 
@@ -38,7 +38,7 @@ export default function AdminProducts() {
 
   const openCreateProduct = () => {
     setEditingProduct(null)
-    setProductForm({ productName: '', description: '', productTypeId: '' })
+    setProductForm({ productName: '', description: '', productTypeId: '', requiresArtwork: false })
     setShowProductModal(true)
   }
 
@@ -47,7 +47,8 @@ export default function AdminProducts() {
     setProductForm({
       productName: product.productName,
       description: product.description || '',
-      productTypeId: productTypes.find(t => t.typeName === product.productType)?.productTypeId || ''
+      productTypeId: productTypes.find(t => t.typeName === product.productType)?.productTypeId || '',
+      requiresArtwork: product.requiresArtwork || false
     })
     setShowProductModal(true)
   }
@@ -69,14 +70,18 @@ export default function AdminProducts() {
     try {
       if (editingProduct) {
         await api.put(`/Products/${editingProduct.productId}`, {
-          ...productForm,
-          productTypeId: parseInt(productForm.productTypeId)
+          productName: productForm.productName,
+          description: productForm.description,
+          productTypeId: parseInt(productForm.productTypeId),
+          requiresArtwork: productForm.requiresArtwork
         })
         showToast('Product updated')
       } else {
         await api.post('/Products', {
-          ...productForm,
-          productTypeId: parseInt(productForm.productTypeId)
+          productName: productForm.productName,
+          description: productForm.description,
+          productTypeId: parseInt(productForm.productTypeId),
+          requiresArtwork: productForm.requiresArtwork
         })
         showToast('Product created')
       }
@@ -277,6 +282,11 @@ export default function AdminProducts() {
                           {product.description && (
                             <p className="text-xs text-gray-400 mt-0.5">{product.description}</p>
                           )}
+                          {product.requiresArtwork && (
+                            <span className="text-xs text-purple-500 bg-purple-50 px-2 py-0.5 rounded-full mt-1 inline-block">
+                              📎 Requires artwork
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -362,6 +372,18 @@ export default function AdminProducts() {
                     <option key={type.productTypeId} value={type.productTypeId}>{type.typeName}</option>
                   ))}
                 </select>
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="requiresArtwork"
+                  checked={productForm.requiresArtwork || false}
+                  onChange={e => setProductForm({ ...productForm, requiresArtwork: e.target.checked })}
+                  className="w-4 h-4 accent-orange-500"
+                />
+                <label htmlFor="requiresArtwork" className="text-sm text-gray-600">
+                  This product requires customer artwork upload
+                </label>
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowProductModal(false)} className="flex-1 py-2.5 rounded-lg border border-gray-300 text-sm font-medium hover:bg-gray-50 transition-colors">

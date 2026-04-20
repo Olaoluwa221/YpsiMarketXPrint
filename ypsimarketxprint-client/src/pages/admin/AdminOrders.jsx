@@ -32,6 +32,15 @@ export default function AdminOrders() {
     }
   }
 
+  const handleViewArtwork = async (orderId, variantId) => {
+    try {
+      const res = await api.get(`/Images/orders/${orderId}/artwork/${variantId}/url`)
+      window.open(res.data.url, '_blank')
+    } catch {
+      showToast('Failed to load artwork', 'error')
+    }
+  }
+
   const handleStatusUpdate = async (orderId, newStatus) => {
     try {
       await api.put(`/Orders/${orderId}/status`, { orderStatus: newStatus })
@@ -68,8 +77,8 @@ export default function AdminOrders() {
               key={status}
               onClick={() => setFilterStatus(status)}
               className={`px-4 py-2 rounded-full text-sm font-medium capitalize transition-all duration-200 ${filterStatus === status
-                  ? 'text-white shadow-md scale-105'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:border-orange-400 hover:text-orange-500'
+                ? 'text-white shadow-md scale-105'
+                : 'bg-white text-gray-600 border border-gray-200 hover:border-orange-400 hover:text-orange-500'
                 }`}
               style={filterStatus === status ? { backgroundColor: '#E8620A' } : {}}
             >
@@ -104,7 +113,15 @@ export default function AdminOrders() {
                   {filtered.map((order, i) => (
                     <tr
                       key={order.orderId}
-                      onClick={() => setSelectedOrder(order)}
+                      onClick={async () => {
+                        try {
+                          const res = await api.get(`/Orders/all`)
+                          const fresh = res.data.find(o => o.orderId === order.orderId)
+                          setSelectedOrder(fresh || order)
+                        } catch {
+                          setSelectedOrder(order)
+                        }
+                      }}
                       className={`border-b border-gray-100 cursor-pointer transition-colors ${selectedOrder?.orderId === order.orderId ? 'bg-orange-50' : 'hover:bg-gray-50'
                         } ${i === filtered.length - 1 ? 'border-0' : ''}`}
                     >
@@ -178,15 +195,26 @@ export default function AdminOrders() {
               <div className="border-t border-gray-100 pt-4 mb-6">
                 <h3 className="text-sm font-semibold mb-3" style={{ color: '#1B2A4A' }}>Items</h3>
                 <div className="space-y-3">
-                  {selectedOrder.items.map((item, i) => (
-                    <div key={i} className="flex justify-between text-sm">
-                      <div>
-                        <p className="font-medium" style={{ color: '#1B2A4A' }}>{item.productName}</p>
-                        <p className="text-gray-400 text-xs">{item.size} × {item.quantity}</p>
+                  {selectedOrder.items.map((item, i) => {
+                    const artwork = item.artworkUrl || item.ArtworkUrl
+                    return (
+                      <div key={i} className="flex justify-between text-sm">
+                        <div>
+                          <p className="font-medium" style={{ color: '#1B2A4A' }}>{item.productName}</p>
+                          <p className="text-gray-400 text-xs">{item.size} &times; {item.quantity}</p>
+                          {artwork && (
+                            <button
+                              onClick={() => handleViewArtwork(selectedOrder.orderId, item.variantId)}
+                              className="text-xs text-orange-500 hover:text-orange-700 transition-colors mt-0.5 block"
+                            >
+                              📎 View artwork
+                            </button>
+                          )}
+                        </div>
+                        <span className="font-medium" style={{ color: '#1B2A4A' }}>${item.subtotal.toFixed(2)}</span>
                       </div>
-                      <span className="font-medium" style={{ color: '#1B2A4A' }}>${item.subtotal.toFixed(2)}</span>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
 
@@ -199,8 +227,8 @@ export default function AdminOrders() {
                       onClick={() => handleStatusUpdate(selectedOrder.orderId, status)}
                       disabled={selectedOrder.orderStatus === status}
                       className={`py-2 rounded-lg text-xs font-medium capitalize transition-all border ${selectedOrder.orderStatus === status
-                          ? `${statusColors[status]} cursor-default`
-                          : 'border-gray-200 text-gray-600 hover:border-orange-400 hover:text-orange-500'
+                        ? `${statusColors[status]} cursor-default`
+                        : 'border-gray-200 text-gray-600 hover:border-orange-400 hover:text-orange-500'
                         }`}
                     >
                       {selectedOrder.orderStatus === status ? `✓ ${status}` : status}
@@ -212,6 +240,6 @@ export default function AdminOrders() {
           )}
         </div>
       </div>
-    </div>
+    </div >
   )
 }

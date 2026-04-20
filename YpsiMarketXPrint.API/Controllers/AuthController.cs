@@ -211,6 +211,40 @@ namespace YpsiMarketXPrint.API.Controllers
             return Ok(new { message = "Password reset successfully." });
         }
 
+        // PUT api/auth/update-profile
+        [HttpPut("update-profile")]
+        [Authorize]
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto dto)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return NotFound();
+
+            user.FirstName = dto.FirstName;
+            user.LastName = dto.LastName;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { user.FirstName, user.LastName });
+        }
+
+        // PUT api/auth/update-password
+        [HttpPut("update-password")]
+        [Authorize]
+        public async Task<IActionResult> UpdatePassword([FromBody] UpdatePasswordDto dto)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return NotFound();
+
+            if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
+                return BadRequest("Current password is incorrect.");
+
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Password updated successfully." });
+        }
+
         private string GenerateToken(User user)
         {
             var claims = new[]
