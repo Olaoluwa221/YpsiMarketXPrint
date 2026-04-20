@@ -1,14 +1,23 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import api from '../api/axios'
 
 export default function Login() {
   const { login } = useAuth()
+  const { showToast } = useToast()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [form, setForm] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (searchParams.get('reset') === 'success') {
+      showToast('Password reset successfully! Please log in.')
+    }
+  }, [])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -22,7 +31,7 @@ export default function Login() {
       } else {
         navigate('/')
       }
-    } catch (err) {
+    } catch {
       setError('Invalid email or password.')
     } finally {
       setLoading(false)
@@ -71,12 +80,9 @@ export default function Login() {
                 Email address
               </label>
               <input
-                type="email"
-                required
-                value={form.email}
+                type="email" required value={form.email}
                 onChange={e => setForm({ ...form, email: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:border-transparent"
-                style={{ '--tw-ring-color': '#E8620A' }}
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                 placeholder="you@example.com"
               />
             </div>
@@ -85,13 +91,16 @@ export default function Login() {
                 Password
               </label>
               <input
-                type="password"
-                required
-                value={form.password}
+                type="password" required value={form.password}
                 onChange={e => setForm({ ...form, password: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                 placeholder="••••••••"
               />
+            </div>
+            <div className="text-right">
+              <Link to="/forgot-password" className="text-xs hover:opacity-80 transition-opacity" style={{ color: '#E8620A' }}>
+                Forgot password?
+              </Link>
             </div>
             <button
               type="submit"
@@ -113,4 +122,4 @@ export default function Login() {
       </div>
     </div>
   )
-}
+} 

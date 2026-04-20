@@ -149,6 +149,68 @@ namespace YpsiMarketXPrint.API.Controllers
             }
         }
 
+        // POST api/auth/forgot-password
+        [HttpPost("forgot-password")]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+
+            // Always return OK to prevent email enumeration
+            if (user == null)
+                return Ok(new { message = "If that email exists, a reset link has been sent." });
+
+            // Invalidate any existing tokens
+            var existingTokens = _context.PasswordResetTokens
+                .Where(t => t.UserId == user.UserId && !t.Used);
+            _context.PasswordResetTokens.RemoveRange(existingTokens);
+
+            // Generate new token
+            var token = Convert.ToBase64String(Guid.NewGuid().ToByteArray())
+                .Replace("+", "-").Replace("/", "_").Replace("=", "");
+
+            _context.PasswordResetTokens.Add(new PasswordResetToken
+            {
+                UserId = user.UserId,
+                Token = token,
+                ExpiresAt = DateTime.UtcNow.AddHours(1),
+                Used = false
+            });
+
+            await _context.SaveChangesAsync();
+
+            // Send reset email
+            try
+            {
+                if (_emailService != null)
+                    await _emailService.SendPasswordResetAsync(user.Email, token);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Email failed: {ex.Message}");
+            }
+
+            return Ok(new { message = "If that email exists, a reset link has been sent." });
+        }
+
+        // POST api/auth/reset-password
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+        {
+            var resetToken = await _context.PasswordResetTokens
+                .Include(t => t.User)
+                .FirstOrDefaultAsync(t => t.Token == dto.Token && !t.Used);
+
+            if (resetToken == null || resetToken.ExpiresAt < DateTime.UtcNow)
+                return BadRequest("Invalid or expired reset token.");
+
+            resetToken.User.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+            resetToken.Used = true;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Password reset successfully." });
+        }
+
         private string GenerateToken(User user)
         {
             var claims = new[]
