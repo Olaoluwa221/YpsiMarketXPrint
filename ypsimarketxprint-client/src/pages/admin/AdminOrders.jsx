@@ -7,10 +7,20 @@ const statusColors = {
   processing: 'bg-blue-50 text-blue-600 border-blue-200',
   shipped: 'bg-purple-50 text-purple-600 border-purple-200',
   delivered: 'bg-green-50 text-green-600 border-green-200',
+  readyforpickup: 'bg-orange-50 text-orange-600 border-orange-200',
+  pickedup: 'bg-green-50 text-green-600 border-green-200',
   cancelled: 'bg-red-50 text-red-600 border-red-200',
 }
 
-const statuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled']
+const allStatuses = ['pending', 'processing', 'shipped', 'delivered', 'readyforpickup', 'pickedup', 'cancelled']
+const shippingStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled']
+const pickupStatuses = ['pending', 'processing', 'readyforpickup', 'pickedup', 'cancelled']
+
+const getStatuses = (deliveryMethod) =>
+  deliveryMethod === 'pickup' ? pickupStatuses : shippingStatuses
+
+const formatStatus = (status) =>
+  status.replace('readyforpickup', 'Ready for Pickup').replace('pickedup', 'Picked Up')
 
 export default function AdminOrders() {
   const { showToast } = useToast()
@@ -72,17 +82,17 @@ export default function AdminOrders() {
 
         {/* Status filters */}
         <div className="flex gap-2 flex-wrap mb-6">
-          {['all', ...statuses].map(status => (
+          {['all', ...allStatuses].map(status => (
             <button
               key={status}
               onClick={() => setFilterStatus(status)}
               className={`px-4 py-2 rounded-full text-sm font-medium capitalize transition-all duration-200 ${filterStatus === status
-                ? 'text-white shadow-md scale-105'
-                : 'bg-white text-gray-600 border border-gray-200 hover:border-orange-400 hover:text-orange-500'
+                  ? 'text-white shadow-md scale-105'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:border-orange-400 hover:text-orange-500'
                 }`}
               style={filterStatus === status ? { backgroundColor: '#E8620A' } : {}}
             >
-              {status}
+              {formatStatus(status)}
             </button>
           ))}
         </div>
@@ -104,6 +114,7 @@ export default function AdminOrders() {
                   <tr style={{ backgroundColor: '#f8f9fa' }} className="border-b border-gray-200">
                     <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Order</th>
                     <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
+                    <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Delivery</th>
                     <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
                     <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                     <th className="text-right px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Update</th>
@@ -115,7 +126,7 @@ export default function AdminOrders() {
                       key={order.orderId}
                       onClick={async () => {
                         try {
-                          const res = await api.get(`/Orders/all`)
+                          const res = await api.get('/Orders/all')
                           const fresh = res.data.find(o => o.orderId === order.orderId)
                           setSelectedOrder(fresh || order)
                         } catch {
@@ -133,12 +144,20 @@ export default function AdminOrders() {
                       <td className="px-6 py-4 text-sm text-gray-500">
                         {new Date(order.dateOrdered).toLocaleDateString()}
                       </td>
+                      <td className="px-6 py-4">
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full border capitalize ${order.deliveryMethod === 'pickup'
+                            ? 'bg-orange-50 text-orange-600 border-orange-200'
+                            : 'bg-blue-50 text-blue-600 border-blue-200'
+                          }`}>
+                          {order.deliveryMethod === 'pickup' ? '🏪 Pickup' : '🚚 Shipping'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 text-sm font-semibold" style={{ color: '#E8620A' }}>
                         ${order.total.toFixed(2)}
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full border capitalize ${statusColors[order.orderStatus]}`}>
-                          {order.orderStatus}
+                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full border capitalize ${statusColors[order.orderStatus] || statusColors.pending}`}>
+                          {formatStatus(order.orderStatus)}
                         </span>
                       </td>
                       <td className="px-6 py-4">
@@ -152,8 +171,8 @@ export default function AdminOrders() {
                             onClick={e => e.stopPropagation()}
                             className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-500"
                           >
-                            {statuses.map(s => (
-                              <option key={s} value={s} className="capitalize">{s}</option>
+                            {getStatuses(order.deliveryMethod).map(s => (
+                              <option key={s} value={s}>{formatStatus(s)}</option>
                             ))}
                           </select>
                         </div>
@@ -181,9 +200,18 @@ export default function AdminOrders() {
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Delivery</span>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full border capitalize ${selectedOrder.deliveryMethod === 'pickup'
+                      ? 'bg-orange-50 text-orange-600 border-orange-200'
+                      : 'bg-blue-50 text-blue-600 border-blue-200'
+                    }`}>
+                    {selectedOrder.deliveryMethod === 'pickup' ? '🏪 Pickup' : '🚚 Shipping'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Status</span>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full border capitalize ${statusColors[selectedOrder.orderStatus]}`}>
-                    {selectedOrder.orderStatus}
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full border capitalize ${statusColors[selectedOrder.orderStatus] || statusColors.pending}`}>
+                    {formatStatus(selectedOrder.orderStatus)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -201,7 +229,7 @@ export default function AdminOrders() {
                       <div key={i} className="flex justify-between text-sm">
                         <div>
                           <p className="font-medium" style={{ color: '#1B2A4A' }}>{item.productName}</p>
-                          <p className="text-gray-400 text-xs">{item.size} &times; {item.quantity}</p>
+                          <p className="text-gray-400 text-xs">{item.size} × {item.quantity}</p>
                           {artwork && (
                             <button
                               onClick={() => handleViewArtwork(selectedOrder.orderId, item.variantId)}
@@ -221,17 +249,17 @@ export default function AdminOrders() {
               <div className="border-t border-gray-100 pt-4">
                 <h3 className="text-sm font-semibold mb-3" style={{ color: '#1B2A4A' }}>Update status</h3>
                 <div className="grid grid-cols-1 gap-2">
-                  {statuses.map(status => (
+                  {getStatuses(selectedOrder.deliveryMethod).map(status => (
                     <button
                       key={status}
                       onClick={() => handleStatusUpdate(selectedOrder.orderId, status)}
                       disabled={selectedOrder.orderStatus === status}
                       className={`py-2 rounded-lg text-xs font-medium capitalize transition-all border ${selectedOrder.orderStatus === status
-                        ? `${statusColors[status]} cursor-default`
-                        : 'border-gray-200 text-gray-600 hover:border-orange-400 hover:text-orange-500'
+                          ? `${statusColors[status] || statusColors.pending} cursor-default`
+                          : 'border-gray-200 text-gray-600 hover:border-orange-400 hover:text-orange-500'
                         }`}
                     >
-                      {selectedOrder.orderStatus === status ? `✓ ${status}` : status}
+                      {selectedOrder.orderStatus === status ? `✓ ` : ''}{formatStatus(status)}
                     </button>
                   ))}
                 </div>
@@ -240,6 +268,6 @@ export default function AdminOrders() {
           )}
         </div>
       </div>
-    </div >
+    </div>
   )
 }

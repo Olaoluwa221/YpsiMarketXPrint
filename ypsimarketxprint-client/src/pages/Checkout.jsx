@@ -44,7 +44,8 @@ function CheckoutForm({ cart, user }) {
       if (user) {
         res = await api.post('/Orders/checkout', {
           guestEmail: null,
-          cartItems: null
+          cartItems: null,
+          deliveryMethod: deliveryMethod === 'pickup' ? 'Pickup' : 'Shipping'
         })
       } else {
         res = await api.post('/Orders/checkout', {
@@ -52,7 +53,8 @@ function CheckoutForm({ cart, user }) {
           cartItems: cart.items.map(item => ({
             variantId: item.variantId,
             quantity: item.quantity
-          }))
+          })),
+          deliveryMethod: deliveryMethod === 'pickup' ? 'Pickup' : 'Shipping'
         })
         localStorage.removeItem('guestCart')
       }

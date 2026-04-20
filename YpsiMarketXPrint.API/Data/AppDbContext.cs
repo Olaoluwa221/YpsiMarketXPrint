@@ -19,6 +19,7 @@ namespace YpsiMarketXPrint.API.Data
         public DbSet<CartItem> CartItems { get; set; }
         public DbSet<ProductType> ProductTypes { get; set; }
         public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // Compound primary key for ProductPicture
@@ -41,6 +42,9 @@ namespace YpsiMarketXPrint.API.Data
 
             // Enum-like enforcement for OrderStatus
             modelBuilder.Entity<Order>().Property(o => o.OrderStatus).HasConversion<string>();
+
+            // Enum-like enforcement for DeliveryMethod
+            modelBuilder.Entity<Order>().Property(o => o.DeliveryMethod).HasConversion<string>();
 
             modelBuilder
                 .Entity<OrderItem>()

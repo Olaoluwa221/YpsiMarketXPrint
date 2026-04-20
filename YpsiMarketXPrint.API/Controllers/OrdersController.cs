@@ -33,7 +33,6 @@ namespace YpsiMarketXPrint.API.Controllers
             string? guestEmail = null;
             Cart? cart = null;
 
-            // Check if user is logged in
             var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (userIdClaim != null)
             {
@@ -45,12 +44,10 @@ namespace YpsiMarketXPrint.API.Controllers
             }
             else
             {
-                // Guest checkout
                 if (string.IsNullOrWhiteSpace(dto?.GuestEmail))
                     return BadRequest("Email is required for guest checkout.");
                 guestEmail = dto.GuestEmail;
 
-                // For guests, cart items come from the request
                 if (dto.CartItems == null || !dto.CartItems.Any())
                     return BadRequest("Your cart is empty.");
             }
@@ -63,7 +60,14 @@ namespace YpsiMarketXPrint.API.Controllers
                 UserId = userId,
                 GuestEmail = guestEmail,
                 DateOrdered = DateTime.UtcNow,
-                OrderStatus = "pending",
+                OrderStatus = OrderStatus.Pending,
+                DeliveryMethod = Enum.TryParse<DeliveryMethod>(
+                    dto?.DeliveryMethod,
+                    true,
+                    out var dm
+                )
+                    ? dm
+                    : DeliveryMethod.Shipping,
             };
 
             _context.Orders.Add(order);
@@ -88,7 +92,6 @@ namespace YpsiMarketXPrint.API.Controllers
             }
             else
             {
-                // Guest order items
                 var variantIds = dto!.CartItems!.Select(ci => ci.VariantId).ToList();
                 var variants = await _context
                     .ProductVariants.Where(v => variantIds.Contains(v.VariantId))
@@ -112,7 +115,6 @@ namespace YpsiMarketXPrint.API.Controllers
             _context.OrderItems.AddRange(orderItems);
             await _context.SaveChangesAsync();
 
-            // Send confirmation email
             try
             {
                 var emailTo = guestEmail ?? (await _context.Users.FindAsync(userId))?.Email;
@@ -147,7 +149,8 @@ namespace YpsiMarketXPrint.API.Controllers
                 {
                     OrderId = o.OrderId,
                     DateOrdered = o.DateOrdered,
-                    OrderStatus = o.OrderStatus,
+                    OrderStatus = o.OrderStatus.ToString().ToLower(),
+                    DeliveryMethod = o.DeliveryMethod.ToString().ToLower(),
                     Items = o
                         .OrderItems.Select(oi => new OrderItemDto
                         {
@@ -188,7 +191,8 @@ namespace YpsiMarketXPrint.API.Controllers
             {
                 OrderId = order.OrderId,
                 DateOrdered = order.DateOrdered,
-                OrderStatus = order.OrderStatus,
+                OrderStatus = order.OrderStatus.ToString().ToLower(),
+                DeliveryMethod = order.DeliveryMethod.ToString().ToLower(),
                 Items = order
                     .OrderItems.Select(oi => new OrderItemDto
                     {
@@ -219,56 +223,60 @@ namespace YpsiMarketXPrint.API.Controllers
                 {
                     OrderId = o.OrderId,
                     DateOrdered = o.DateOrdered,
-                    OrderStatus = o.OrderStatus,
-                    Items = o.OrderItems.Select(oi => new OrderItemDto
-                    {
-                        VariantId = oi.VariantId,
-                        ProductId = oi.Variant.ProductId,
-                        ProductName = oi.Variant.Product.ProductName,
-                        Size = oi.Variant.Size,
-                        Quantity = oi.Quantity,
-                        UnitPrice = oi.UnitPrice,
-                        ArtworkUrl = oi.ArtworkUrl,
-                    }).ToList(),
+                    OrderStatus = o.OrderStatus.ToString().ToLower(),
+                    DeliveryMethod = o.DeliveryMethod.ToString().ToLower(),
+                    Items = o
+                        .OrderItems.Select(oi => new OrderItemDto
+                        {
+                            VariantId = oi.VariantId,
+                            ProductId = oi.Variant.ProductId,
+                            ProductName = oi.Variant.Product.ProductName,
+                            Size = oi.Variant.Size,
+                            Quantity = oi.Quantity,
+                            UnitPrice = oi.UnitPrice,
+                            ArtworkUrl = oi.ArtworkUrl,
+                        })
+                        .ToList(),
                 })
                 .ToListAsync();
 
             return Ok(orders);
         }
 
-        // PUT api/orders/1/status - adminonly
+        // PUT api/orders/1/status - admin only
         [HttpPut("{id}/status")]
         [Authorize(Roles = "admin")]
         public async Task<IActionResult> UpdateStatus(int id, UpdateOrderStatusDto dto)
         {
-            var validStatuses = new[]
-            {
-                "pending",
-                "processing",
-                "shipped",
-                "delivered",
-                "cancelled",
-            };
-            if (!validStatuses.Contains(dto.OrderStatus.ToLower()))
+            if (!Enum.TryParse<OrderStatus>(dto.OrderStatus, true, out var newStatus))
                 return BadRequest("Invalid order status.");
 
             var order = await _context.Orders.FindAsync(id);
             if (order == null)
                 return NotFound();
 
-            order.OrderStatus = dto.OrderStatus.ToLower();
+            order.OrderStatus = newStatus;
             await _context.SaveChangesAsync();
 
-            // Send status update email
             try
             {
-                var user = await _context.Users.FindAsync(order.UserId);
-                if (_emailService != null && user != null)
+                var emailTo = order.UserId.HasValue
+                    ? (await _context.Users.FindAsync(order.UserId))?.Email
+                    : order.GuestEmail;
+
+                if (_emailService != null && emailTo != null)
+                {
+                    var total = await _context
+                        .OrderItems.Where(oi => oi.OrderId == order.OrderId)
+                        .SumAsync(oi => oi.UnitPrice * oi.Quantity);
+
                     await _emailService.SendOrderStatusUpdateAsync(
-                        user.Email,
+                        emailTo,
                         order.OrderId,
-                        order.OrderStatus
+                        order.OrderStatus.ToString().ToLower(),
+                        total
                     );
+                }
             }
             catch (Exception ex)
             {
@@ -280,7 +288,7 @@ namespace YpsiMarketXPrint.API.Controllers
                 {
                     message = "Order status updated.",
                     orderId = order.OrderId,
-                    status = order.OrderStatus,
+                    status = order.OrderStatus.ToString().ToLower(),
                 }
             );
         }

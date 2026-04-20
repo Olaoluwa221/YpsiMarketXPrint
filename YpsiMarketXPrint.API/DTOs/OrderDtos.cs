@@ -17,8 +17,9 @@
         public int OrderId { get; set; }
         public DateTime DateOrdered { get; set; }
         public string OrderStatus { get; set; } = null!;
+        public string DeliveryMethod { get; set; } = "shipping";
+        public decimal Total => Items.Sum(i => i.Subtotal);
         public List<OrderItemDto> Items { get; set; } = [];
-        public decimal Total => Math.Round(Items.Sum(i => i.Subtotal), 2);
     }
 
     public class UpdateOrderStatusDto
@@ -30,6 +31,7 @@
     {
         public string? GuestEmail { get; set; }
         public List<GuestCartItemDto>? CartItems { get; set; }
+        public string DeliveryMethod { get; set; } = "Shipping";
     }
 
     public class CreateIntentDto

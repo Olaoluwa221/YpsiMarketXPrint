@@ -44,7 +44,7 @@ namespace YpsiMarketXPrint.API.Controllers
                 LastName = dto.LastName,
                 Email = dto.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-                UserType = "customer",
+                UserType = UserType.Customer,
                 MarketingOptIn = dto.MarketingOptIn,
             };
 
@@ -69,7 +69,7 @@ namespace YpsiMarketXPrint.API.Controllers
                 {
                     Token = token,
                     Email = user.Email,
-                    UserType = user.UserType,
+                    UserType = user.UserType.ToString().ToLower(),
                 }
             );
         }
@@ -107,7 +107,7 @@ namespace YpsiMarketXPrint.API.Controllers
                     user.FirstName,
                     user.LastName,
                     user.Email,
-                    user.UserType,
+                    UserType = user.UserType.ToString().ToLower(),
                     user.MarketingOptIn,
                 }
             );
@@ -155,30 +155,32 @@ namespace YpsiMarketXPrint.API.Controllers
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
 
-            // Always return OK to prevent email enumeration
             if (user == null)
                 return Ok(new { message = "If that email exists, a reset link has been sent." });
 
-            // Invalidate any existing tokens
-            var existingTokens = _context.PasswordResetTokens
-                .Where(t => t.UserId == user.UserId && !t.Used);
+            var existingTokens = _context.PasswordResetTokens.Where(t =>
+                t.UserId == user.UserId && !t.Used
+            );
             _context.PasswordResetTokens.RemoveRange(existingTokens);
 
-            // Generate new token
-            var token = Convert.ToBase64String(Guid.NewGuid().ToByteArray())
-                .Replace("+", "-").Replace("/", "_").Replace("=", "");
+            var token = Convert
+                .ToBase64String(Guid.NewGuid().ToByteArray())
+                .Replace("+", "-")
+                .Replace("/", "_")
+                .Replace("=", "");
 
-            _context.PasswordResetTokens.Add(new PasswordResetToken
-            {
-                UserId = user.UserId,
-                Token = token,
-                ExpiresAt = DateTime.UtcNow.AddHours(1),
-                Used = false
-            });
+            _context.PasswordResetTokens.Add(
+                new PasswordResetToken
+                {
+                    UserId = user.UserId,
+                    Token = token,
+                    ExpiresAt = DateTime.UtcNow.AddHours(1),
+                    Used = false,
+                }
+            );
 
             await _context.SaveChangesAsync();
 
-            // Send reset email
             try
             {
                 if (_emailService != null)
@@ -196,8 +198,8 @@ namespace YpsiMarketXPrint.API.Controllers
         [HttpPost("reset-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
         {
-            var resetToken = await _context.PasswordResetTokens
-                .Include(t => t.User)
+            var resetToken = await _context
+                .PasswordResetTokens.Include(t => t.User)
                 .FirstOrDefaultAsync(t => t.Token == dto.Token && !t.Used);
 
             if (resetToken == null || resetToken.ExpiresAt < DateTime.UtcNow)
@@ -218,7 +220,8 @@ namespace YpsiMarketXPrint.API.Controllers
         {
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var user = await _context.Users.FindAsync(userId);
-            if (user == null) return NotFound();
+            if (user == null)
+                return NotFound();
 
             user.FirstName = dto.FirstName;
             user.LastName = dto.LastName;
@@ -234,7 +237,8 @@ namespace YpsiMarketXPrint.API.Controllers
         {
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var user = await _context.Users.FindAsync(userId);
-            if (user == null) return NotFound();
+            if (user == null)
+                return NotFound();
 
             if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
                 return BadRequest("Current password is incorrect.");
@@ -245,22 +249,21 @@ namespace YpsiMarketXPrint.API.Controllers
             return Ok(new { message = "Password updated successfully." });
         }
 
-
         // GET api/auth/users
         [HttpGet("users")]
         [Authorize(Roles = "admin")]
         public async Task<IActionResult> GetAllUsers()
         {
-            var users = await _context.Users
-                .Select(u => new
+            var users = await _context
+                .Users.Select(u => new
                 {
                     u.UserId,
                     u.FirstName,
                     u.LastName,
                     u.Email,
-                    u.UserType,
+                    UserType = u.UserType.ToString().ToLower(),
                     u.MarketingOptIn,
-                    OrderCount = _context.Orders.Count(o => o.UserId == u.UserId)
+                    OrderCount = _context.Orders.Count(o => o.UserId == u.UserId),
                 })
                 .OrderBy(u => u.Email)
                 .ToListAsync();
@@ -274,16 +277,23 @@ namespace YpsiMarketXPrint.API.Controllers
         public async Task<IActionResult> UpdateUserRole(int id, [FromBody] UpdateUserRoleDto dto)
         {
             var user = await _context.Users.FindAsync(id);
-            if (user == null) return NotFound();
+            if (user == null)
+                return NotFound();
 
-            var validRoles = new[] { "customer", "admin" };
-            if (!validRoles.Contains(dto.Role.ToLower()))
+            if (!Enum.TryParse<UserType>(dto.Role, true, out var newUserType))
                 return BadRequest("Invalid role.");
 
-            user.UserType = dto.Role.ToLower();
+            user.UserType = newUserType;
             await _context.SaveChangesAsync();
 
-            return Ok(new { user.UserId, user.Email, user.UserType });
+            return Ok(
+                new
+                {
+                    user.UserId,
+                    user.Email,
+                    UserType = user.UserType.ToString().ToLower(),
+                }
+            );
         }
 
         private string GenerateToken(User user)
@@ -292,7 +302,7 @@ namespace YpsiMarketXPrint.API.Controllers
             {
                 new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim("role", user.UserType),
+                new Claim("role", user.UserType.ToString().ToLower()),
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));

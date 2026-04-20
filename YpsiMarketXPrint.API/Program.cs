@@ -5,10 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Resend;
 using Scalar.AspNetCore;
+using Stripe;
 using YpsiMarketXPrint.API.Data;
 using YpsiMarketXPrint.API.Models;
 using YpsiMarketXPrint.API.Services;
-using Stripe;
 
 namespace YpsiMarketXPrint.API
 {
@@ -110,7 +110,7 @@ namespace YpsiMarketXPrint.API
 
                         db.Database.Migrate();
 
-                        if (!db.Users.Any(u => u.UserType == "admin"))
+                        if (!db.Users.Any(u => u.UserType == UserType.Admin))
                         {
                             db.Users.Add(
                                 new User
@@ -121,7 +121,7 @@ namespace YpsiMarketXPrint.API
                                     PasswordHash = BCrypt.Net.BCrypt.HashPassword(
                                         config["Seed:AdminPassword"]!
                                     ),
-                                    UserType = "admin",
+                                    UserType = UserType.Admin,
                                 }
                             );
                             db.SaveChanges();

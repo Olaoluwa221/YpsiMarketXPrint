@@ -8,7 +8,7 @@
         public string Email { get; set; } = null!;
         public string PasswordHash { get; set; } = null!;
         public bool MarketingOptIn { get; set; } = false;
-        public string UserType { get; set; } = "customer";
+        public UserType UserType { get; set; } = UserType.Customer;
 
         public ICollection<Picture> Pictures { get; set; } = [];
         public ICollection<Order> Orders { get; set; } = [];

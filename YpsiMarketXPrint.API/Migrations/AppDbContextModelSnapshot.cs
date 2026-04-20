@@ -76,6 +76,10 @@ namespace YpsiMarketXPrint.API.Migrations
                     b.Property<DateTime>("DateOrdered")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("DeliveryMethod")
+                        .IsRequired()
+                        .HasColumnType("longtext");
+
                     b.Property<string>("GuestEmail")
                         .HasColumnType("longtext");
 
