@@ -3,17 +3,26 @@ services:
     image: mysql:8.0
     container_name: ypsiprint-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: yourpassword
+      MYSQL_ROOT_PASSWORD: your_db_password_here
       MYSQL_DATABASE: YpsiPrint
     ports:
       - "3307:3306"
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pyourpassword"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pyour_db_password_here"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: ypsiprint-azurite
+    ports:
+      - "10000:10000"
+    volumes:
+      - azurite-data:/data
+    command: azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --location /data --loose --skipApiVersionCheck
 
   api:
     build:
@@ -23,15 +32,25 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - ConnectionStrings__DefaultConnection=Server=mysql;Database=YpsiPrint;User=root;Password=yourpassword;
-      - Jwt__Key=your_secret_key_here
+      - ConnectionStrings__DefaultConnection=Server=mysql;Database=YpsiPrint;User=root;Password=your_db_password_here;
+      - Jwt__Key=your_jwt_secret_key_here_min_32_chars
       - Jwt__Issuer=YpsiMarketXPrint
       - Jwt__Audience=YpsiMarketXPrint
       - Seed__AdminEmail=admin@yoursite.com
-      - Seed__AdminPassword=yourpassword
+      - Seed__AdminPassword=YourAdminPassword123!
+      - "Azure__StorageConnectionString=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tiqvXYxGijB7XiySZd3Of0Nfkqq3dh3GH/g==;BlobEndpoint=http://azurite:10000/devstoreaccount1"
+      - Azure__ContainerName=product-images
+      - Resend__ApiKey=re_your_resend_api_key_here
+      - Resend__FromEmail=onboarding@resend.dev
+      - Resend__ReplyTo=your_reply_to_email@gmail.com
+      - Stripe__PublishableKey=pk_test_your_publishable_key_here
+      - Stripe__SecretKey=sk_test_your_secret_key_here
     depends_on:
       mysql:
         condition: service_healthy
+      azurite:
+        condition: service_started
 
 volumes:
   mysql-data:
+  azurite-data:

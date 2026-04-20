@@ -8,6 +8,7 @@ using Scalar.AspNetCore;
 using YpsiMarketXPrint.API.Data;
 using YpsiMarketXPrint.API.Models;
 using YpsiMarketXPrint.API.Services;
+using Stripe;
 
 namespace YpsiMarketXPrint.API
 {
@@ -31,6 +32,9 @@ namespace YpsiMarketXPrint.API
                         )
                 )
             );
+
+            // Stripe
+            StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
 
             // Allow requests from the React frontend during development
             builder.Services.AddCors(options =>

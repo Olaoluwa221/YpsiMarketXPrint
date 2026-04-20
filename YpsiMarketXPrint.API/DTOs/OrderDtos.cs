@@ -31,6 +31,11 @@
         public List<GuestCartItemDto>? CartItems { get; set; }
     }
 
+    public class CreateIntentDto
+    {
+        public List<GuestCartItemDto>? CartItems { get; set; }
+    }
+
     public class GuestCartItemDto
     {
         public int VariantId { get; set; }
