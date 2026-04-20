@@ -245,6 +245,47 @@ namespace YpsiMarketXPrint.API.Controllers
             return Ok(new { message = "Password updated successfully." });
         }
 
+
+        // GET api/auth/users
+        [HttpGet("users")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> GetAllUsers()
+        {
+            var users = await _context.Users
+                .Select(u => new
+                {
+                    u.UserId,
+                    u.FirstName,
+                    u.LastName,
+                    u.Email,
+                    u.UserType,
+                    u.MarketingOptIn,
+                    OrderCount = _context.Orders.Count(o => o.UserId == u.UserId)
+                })
+                .OrderBy(u => u.Email)
+                .ToListAsync();
+
+            return Ok(users);
+        }
+
+        // PUT api/auth/users/{id}/role
+        [HttpPut("users/{id}/role")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> UpdateUserRole(int id, [FromBody] UpdateUserRoleDto dto)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null) return NotFound();
+
+            var validRoles = new[] { "customer", "admin" };
+            if (!validRoles.Contains(dto.Role.ToLower()))
+                return BadRequest("Invalid role.");
+
+            user.UserType = dto.Role.ToLower();
+            await _context.SaveChangesAsync();
+
+            return Ok(new { user.UserId, user.Email, user.UserType });
+        }
+
         private string GenerateToken(User user)
         {
             var claims = new[]

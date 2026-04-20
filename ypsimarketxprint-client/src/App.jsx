@@ -17,6 +17,7 @@ import AdminOrders from './pages/admin/AdminOrders'
 import AdminEmails from './pages/admin/AdminEmails'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
+import AdminUsers from './pages/admin/AdminUsers'
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user, authLoading } = useAuth()
@@ -43,6 +44,7 @@ function App() {
           <Route path="/admin/emails" element={<ProtectedRoute><AdminEmails /></ProtectedRoute>} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/admin/users" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
           <Route path="/profile" element={
             <ProtectedRoute><Profile /></ProtectedRoute>
           } />

@@ -40,6 +40,7 @@ export default function Navbar() {
       <NavItem to="/admin/products" onClick={closeMenu}>Products</NavItem>
       <NavItem to="/admin/orders" onClick={closeMenu}>Orders</NavItem>
       <NavItem to="/admin/emails" onClick={closeMenu}>Emails</NavItem>
+      <NavItem to="/admin/users" onClick={closeMenu}>Users</NavItem>
     </>
   ) : (
     <>

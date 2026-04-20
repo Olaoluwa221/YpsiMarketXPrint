@@ -181,7 +181,7 @@ namespace YpsiMarketXPrint.API.Controllers
             if (order == null)
                 return NotFound();
 
-            if (order.UserId != userId && !User.IsInRole("admin") && !User.IsInRole("staff"))
+            if (order.UserId != userId && !User.IsInRole("admin"))
                 return Forbid();
 
             var dto = new OrderDto
@@ -205,9 +205,9 @@ namespace YpsiMarketXPrint.API.Controllers
             return Ok(dto);
         }
 
-        // GET api/orders/all - admin and staff only
+        // GET api/orders/all - admin only
         [HttpGet("all")]
-        [Authorize(Roles = "admin,staff")]
+        [Authorize(Roles = "admin")]
         public async Task<IActionResult> GetAllOrders()
         {
             var orders = await _context
@@ -236,9 +236,9 @@ namespace YpsiMarketXPrint.API.Controllers
             return Ok(orders);
         }
 
-        // PUT api/orders/1/status - admin and staff only
+        // PUT api/orders/1/status - adminonly
         [HttpPut("{id}/status")]
-        [Authorize(Roles = "admin,staff")]
+        [Authorize(Roles = "admin")]
         public async Task<IActionResult> UpdateStatus(int id, UpdateOrderStatusDto dto)
         {
             var validStatuses = new[]
