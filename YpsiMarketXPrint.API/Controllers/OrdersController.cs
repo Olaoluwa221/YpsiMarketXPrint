@@ -253,7 +253,6 @@ namespace YpsiMarketXPrint.API.Controllers
                         Quantity = oi.Quantity,
                         UnitPrice = oi.UnitPrice,
                         ArtworkId = oi.ArtworkId,
-                        ArtworkUrl = oi.Artwork != null ? oi.Artwork.Link : null,
                         RequiresArtwork = oi.Variant.Product.RequiresArtwork,
                     }).ToList(),
                 })
@@ -273,8 +272,6 @@ namespace YpsiMarketXPrint.API.Controllers
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Variant)
                         .ThenInclude(v => v.Product)
-                .Include(o => o.OrderItems)
-                    .ThenInclude(oi => oi.Artwork)
                 .FirstOrDefaultAsync(o => o.OrderId == id);
 
             if (order == null)
@@ -299,7 +296,6 @@ namespace YpsiMarketXPrint.API.Controllers
                     Quantity = oi.Quantity,
                     UnitPrice = oi.UnitPrice,
                     ArtworkId = oi.ArtworkId,
-                    ArtworkUrl = oi.Artwork != null ? oi.Artwork.Link : null,
                     RequiresArtwork = oi.Variant.Product.RequiresArtwork,
                 }).ToList(),
             };
@@ -333,7 +329,6 @@ namespace YpsiMarketXPrint.API.Controllers
                         Quantity = oi.Quantity,
                         UnitPrice = oi.UnitPrice,
                         ArtworkId = oi.ArtworkId,
-                        ArtworkUrl = oi.Artwork != null ? oi.Artwork.Link : null,
                         RequiresArtwork = oi.Variant.Product.RequiresArtwork,
                     }).ToList(),
                 })

@@ -95,8 +95,9 @@ namespace YpsiMarketXPrint.API.Controllers
                 return BadRequest("This order has already shipped or is closed.");
 
             var connectionString = _config["Azure:StorageConnectionString"]!;
+            var containerName = _config["Azure:ArtworkContainerName"] ?? "customer-artwork";
             var serviceClient = new BlobServiceClient(connectionString);
-            var containerClient = serviceClient.GetBlobContainerClient("customer-artwork");
+            var containerClient = serviceClient.GetBlobContainerClient(containerName);
             await containerClient.CreateIfNotExistsAsync(PublicAccessType.None);
 
             var fileName = $"order-{tokenRow.OrderId}-variant-{tokenRow.VariantId}-{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";

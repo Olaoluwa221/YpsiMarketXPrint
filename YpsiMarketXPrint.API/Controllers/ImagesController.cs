@@ -129,7 +129,7 @@ namespace YpsiMarketXPrint.API.Controllers
         private string GenerateArtworkSasUrl(string blobUrl)
         {
             var connectionString = _config["Azure:StorageConnectionString"]!;
-            var containerName = "customer-artwork";
+            var containerName = _config["Azure:ArtworkContainerName"] ?? "customer-artwork";
 
             var fileName = Path.GetFileName(new Uri(blobUrl).AbsolutePath);
 
