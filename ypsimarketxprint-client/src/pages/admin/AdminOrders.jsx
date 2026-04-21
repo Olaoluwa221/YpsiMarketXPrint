@@ -51,6 +51,16 @@ export default function AdminOrders() {
     }
   }
 
+  const handleRegenerateLink = async (orderId, variantId) => {
+    if (!confirm('Send a new artwork upload link to the customer? Any previous link will stop working.')) return
+    try {
+      await api.post(`/Orders/${orderId}/regenerate-artwork-token/${variantId}`)
+      showToast('New upload link emailed to customer')
+    } catch {
+      showToast('Failed to send new link', 'error')
+    }
+  }
+
   const handleStatusUpdate = async (orderId, newStatus) => {
     try {
       await api.put(`/Orders/${orderId}/status`, { orderStatus: newStatus })
@@ -224,18 +234,27 @@ export default function AdminOrders() {
                 <h3 className="text-sm font-semibold mb-3" style={{ color: '#1B2A4A' }}>Items</h3>
                 <div className="space-y-3">
                   {selectedOrder.items.map((item, i) => {
-                    const artwork = item.artworkUrl || item.ArtworkUrl
+                    const hasArtwork = item.artworkId || item.ArtworkId
+                    const needsArtwork = (item.requiresArtwork ?? item.RequiresArtwork) && !hasArtwork
                     return (
                       <div key={i} className="flex justify-between text-sm">
                         <div>
                           <p className="font-medium" style={{ color: '#1B2A4A' }}>{item.productName}</p>
                           <p className="text-gray-400 text-xs">{item.size} × {item.quantity}</p>
-                          {artwork && (
+                          {hasArtwork && (
                             <button
                               onClick={() => handleViewArtwork(selectedOrder.orderId, item.variantId)}
                               className="text-xs text-orange-500 hover:text-orange-700 transition-colors mt-0.5 block"
                             >
                               📎 View artwork
+                            </button>
+                          )}
+                          {needsArtwork && (
+                            <button
+                              onClick={() => handleRegenerateLink(selectedOrder.orderId, item.variantId)}
+                              className="text-xs text-orange-500 hover:text-orange-700 transition-colors mt-0.5 block"
+                            >
+                              ✉️ Resend upload link
                             </button>
                           )}
                         </div>

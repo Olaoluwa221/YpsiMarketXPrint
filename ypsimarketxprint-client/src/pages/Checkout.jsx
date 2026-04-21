@@ -5,7 +5,6 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import api from '../api/axios'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import ArtworkUploader from '../components/ArtworkUploader'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
@@ -244,15 +243,10 @@ function CheckoutForm({ cart, user, deliveryMethod, setDeliveryMethod }) {
 
             {cart?.items?.some(i => i.requiresArtwork) && (
               <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6 text-left">
-                <p className="text-sm font-semibold mb-3" style={{ color: '#1B2A4A' }}>📎 Upload your artwork</p>
-                {cart.items.filter(i => i.requiresArtwork).map(item => (
-                  <ArtworkUploader
-                    key={item.variantId}
-                    orderId={confirmedOrderId}
-                    variantId={item.variantId}
-                    productName={item.productName}
-                  />
-                ))}
+                <p className="text-sm font-semibold mb-1" style={{ color: '#1B2A4A' }}>📎 Check your email</p>
+                <p className="text-xs text-gray-600">
+                  We've sent upload links for the item(s) that need your artwork. Click the link in your email to upload each one.
+                </p>
               </div>
             )}
 

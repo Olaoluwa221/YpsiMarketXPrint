@@ -156,67 +156,21 @@ namespace YpsiMarketXPrint.API.Controllers
         public async Task<IActionResult> GetArtworkUrl(int orderId, int variantId)
         {
             var orderItem = await _context.OrderItems
+                .Include(oi => oi.Artwork)
                 .FirstOrDefaultAsync(oi => oi.OrderId == orderId && oi.VariantId == variantId);
 
-            if (orderItem == null || orderItem.ArtworkUrl == null)
+            if (orderItem == null || orderItem.Artwork == null)
                 return NotFound("No artwork found for this order item.");
 
             try
             {
-                var sasUrl = GenerateArtworkSasUrl(orderItem.ArtworkUrl);
+                var sasUrl = GenerateArtworkSasUrl(orderItem.Artwork.Link);
                 return Ok(new { url = sasUrl });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, $"Failed to generate artwork URL: {ex.Message}");
             }
-        }
-
-        // POST api/images/orders/{orderId}/artwork/{variantId}
-        [HttpPost("orders/{orderId}/artwork/{variantId}")]
-        [AllowAnonymous]
-        public async Task<IActionResult> UploadArtwork(int orderId, int variantId, IFormFile file)
-        {
-            if (file == null || file.Length == 0)
-                return BadRequest("No file provided.");
-
-            if (file.Length > 20 * 1024 * 1024)
-                return BadRequest("File size cannot exceed 20MB.");
-
-            var allowedTypes = new[] {
-                "image/jpeg", "image/png", "image/webp", "image/gif",
-                "application/pdf"
-            };
-            if (!allowedTypes.Contains(file.ContentType.ToLower()))
-                return BadRequest("Only JPEG, PNG, WebP, GIF and PDF files are allowed.");
-
-            var orderItem = await _context.OrderItems
-                .Include(oi => oi.Order)
-                .FirstOrDefaultAsync(oi => oi.OrderId == orderId && oi.VariantId == variantId);
-
-            if (orderItem == null)
-                return NotFound("Order item not found.");
-
-            var connectionString = _config["Azure:StorageConnectionString"]!;
-            var serviceClient = new BlobServiceClient(connectionString);
-            var containerClient = serviceClient.GetBlobContainerClient("customer-artwork");
-            await containerClient.CreateIfNotExistsAsync(PublicAccessType.None);
-
-            var fileName = $"order-{orderId}-variant-{variantId}-{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
-            var blobClient = containerClient.GetBlobClient(fileName);
-
-            using (var stream = file.OpenReadStream())
-            {
-                await blobClient.UploadAsync(stream, new BlobHttpHeaders { ContentType = file.ContentType });
-            }
-
-            var artworkUrl = blobClient.Uri.ToString()
-                .Replace("http://azurite:10000", "http://localhost:10000");
-
-            orderItem.ArtworkUrl = artworkUrl;
-            await _context.SaveChangesAsync();
-
-            return Ok(new { artworkUrl });
         }
 
         // DELETE api/images/products/{productId}/pictures/{pictureId}

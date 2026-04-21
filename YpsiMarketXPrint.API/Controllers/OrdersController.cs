@@ -15,14 +15,18 @@ namespace YpsiMarketXPrint.API.Controllers
     {
         private readonly AppDbContext _context;
         private readonly EmailService? _emailService;
+        private readonly IConfiguration _config;
 
-        public OrdersController(AppDbContext context, EmailService? emailService = null)
+        public OrdersController(AppDbContext context, IConfiguration config, EmailService? emailService = null)
         {
             _context = context;
+            _config = config;
             _emailService = emailService;
         }
 
         private int GetUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        private string FrontendBaseUrl => _config["Frontend:BaseUrl"] ?? "http://localhost:5173";
 
         // POST api/orders/checkout
         [HttpPost("checkout")]
@@ -117,6 +121,8 @@ namespace YpsiMarketXPrint.API.Controllers
                 {
                     var total = orderItems.Sum(oi => oi.UnitPrice * oi.Quantity) + order.ShippingCost;
                     await _emailService.SendOrderConfirmationAsync(emailTo, order.OrderId, total);
+
+                    await GenerateAndSendArtworkTokensAsync(order.OrderId, emailTo);
                 }
             }
             catch (Exception ex)
@@ -125,6 +131,97 @@ namespace YpsiMarketXPrint.API.Controllers
             }
 
             return Ok(new { message = "Order placed successfully.", orderId = order.OrderId });
+        }
+
+        // Creates upload tokens for every order item whose product requires artwork,
+        // then sends one email listing all the links.
+        private async Task GenerateAndSendArtworkTokensAsync(int orderId, string emailTo)
+        {
+            var itemsNeedingArtwork = await _context.OrderItems
+                .Where(oi => oi.OrderId == orderId && oi.Variant.Product.RequiresArtwork)
+                .Include(oi => oi.Variant).ThenInclude(v => v.Product)
+                .ToListAsync();
+
+            if (itemsNeedingArtwork.Count == 0) return;
+
+            // uses FrontendBaseUrl property
+            var emailItems = new List<(string, string, string)>();
+
+            foreach (var oi in itemsNeedingArtwork)
+            {
+                var token = new ArtworkUploadToken
+                {
+                    Token = Guid.NewGuid().ToString("N"),
+                    OrderId = oi.OrderId,
+                    VariantId = oi.VariantId,
+                    CreatedAt = DateTime.UtcNow,
+                };
+                _context.ArtworkUploadTokens.Add(token);
+
+                emailItems.Add((
+                    oi.Variant.Product.ProductName,
+                    oi.Variant.Size,
+                    $"{FrontendBaseUrl}/upload-artwork/{token.Token}"
+                ));
+            }
+
+            await _context.SaveChangesAsync();
+
+            if (_emailService != null)
+                await _emailService.SendArtworkUploadRequestAsync(emailTo, orderId, emailItems);
+        }
+
+        // Invalidates any unused tokens and issues fresh ones for items that still need artwork.
+        // Used when an admin reverts an order from a "done" status back to an active one,
+        // and by the admin "regenerate link" endpoint.
+        private async Task RegenerateMissingArtworkTokensAsync(int orderId, string emailTo)
+        {
+            var itemsNeedingArtwork = await _context.OrderItems
+                .Where(oi => oi.OrderId == orderId
+                             && oi.Variant.Product.RequiresArtwork
+                             && oi.ArtworkId == null)
+                .Include(oi => oi.Variant).ThenInclude(v => v.Product)
+                .ToListAsync();
+
+            if (itemsNeedingArtwork.Count == 0) return;
+
+            var variantIds = itemsNeedingArtwork.Select(oi => oi.VariantId).ToList();
+
+            var existingUnused = await _context.ArtworkUploadTokens
+                .Where(t => t.OrderId == orderId
+                            && variantIds.Contains(t.VariantId)
+                            && t.UsedAt == null
+                            && t.InvalidatedAt == null)
+                .ToListAsync();
+
+            var now = DateTime.UtcNow;
+            foreach (var t in existingUnused) t.InvalidatedAt = now;
+
+            // uses FrontendBaseUrl property
+            var emailItems = new List<(string, string, string)>();
+
+            foreach (var oi in itemsNeedingArtwork)
+            {
+                var token = new ArtworkUploadToken
+                {
+                    Token = Guid.NewGuid().ToString("N"),
+                    OrderId = oi.OrderId,
+                    VariantId = oi.VariantId,
+                    CreatedAt = now,
+                };
+                _context.ArtworkUploadTokens.Add(token);
+
+                emailItems.Add((
+                    oi.Variant.Product.ProductName,
+                    oi.Variant.Size,
+                    $"{FrontendBaseUrl}/upload-artwork/{token.Token}"
+                ));
+            }
+
+            await _context.SaveChangesAsync();
+
+            if (_emailService != null)
+                await _emailService.SendArtworkUploadRequestAsync(emailTo, orderId, emailItems);
         }
 
         // GET api/orders
@@ -155,6 +252,9 @@ namespace YpsiMarketXPrint.API.Controllers
                         Size = oi.Variant.Size,
                         Quantity = oi.Quantity,
                         UnitPrice = oi.UnitPrice,
+                        ArtworkId = oi.ArtworkId,
+                        ArtworkUrl = oi.Artwork != null ? oi.Artwork.Link : null,
+                        RequiresArtwork = oi.Variant.Product.RequiresArtwork,
                     }).ToList(),
                 })
                 .ToListAsync();
@@ -173,6 +273,8 @@ namespace YpsiMarketXPrint.API.Controllers
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Variant)
                         .ThenInclude(v => v.Product)
+                .Include(o => o.OrderItems)
+                    .ThenInclude(oi => oi.Artwork)
                 .FirstOrDefaultAsync(o => o.OrderId == id);
 
             if (order == null)
@@ -196,6 +298,9 @@ namespace YpsiMarketXPrint.API.Controllers
                     Size = oi.Variant.Size,
                     Quantity = oi.Quantity,
                     UnitPrice = oi.UnitPrice,
+                    ArtworkId = oi.ArtworkId,
+                    ArtworkUrl = oi.Artwork != null ? oi.Artwork.Link : null,
+                    RequiresArtwork = oi.Variant.Product.RequiresArtwork,
                 }).ToList(),
             };
 
@@ -227,7 +332,9 @@ namespace YpsiMarketXPrint.API.Controllers
                         Size = oi.Variant.Size,
                         Quantity = oi.Quantity,
                         UnitPrice = oi.UnitPrice,
-                        ArtworkUrl = oi.ArtworkUrl,
+                        ArtworkId = oi.ArtworkId,
+                        ArtworkUrl = oi.Artwork != null ? oi.Artwork.Link : null,
+                        RequiresArtwork = oi.Variant.Product.RequiresArtwork,
                     }).ToList(),
                 })
                 .ToListAsync();
@@ -247,8 +354,31 @@ namespace YpsiMarketXPrint.API.Controllers
             if (order == null)
                 return NotFound();
 
+            var oldStatus = order.OrderStatus;
             order.OrderStatus = newStatus;
             await _context.SaveChangesAsync();
+
+            // If reverting from a "done" status back to an active one, regenerate artwork tokens
+            // for any items that still need artwork uploaded.
+            var doneStatuses = new[] { OrderStatus.Shipped, OrderStatus.Delivered, OrderStatus.PickedUp, OrderStatus.Cancelled };
+            if (doneStatuses.Contains(oldStatus) && !doneStatuses.Contains(newStatus))
+            {
+                var emailToRecipient = order.UserId.HasValue
+                    ? (await _context.Users.FindAsync(order.UserId))?.Email
+                    : order.GuestEmail;
+
+                if (emailToRecipient != null)
+                {
+                    try
+                    {
+                        await RegenerateMissingArtworkTokensAsync(order.OrderId, emailToRecipient);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Artwork token regeneration failed: {ex.Message}");
+                    }
+                }
+            }
 
             try
             {
@@ -282,6 +412,75 @@ namespace YpsiMarketXPrint.API.Controllers
                 orderId = order.OrderId,
                 status = order.OrderStatus.ToString().ToLower(),
             });
+        }
+        // POST api/orders/{id}/regenerate-artwork-token/{variantId} - admin only
+        [HttpPost("{id}/regenerate-artwork-token/{variantId}")]
+        [Authorize(Roles = "admin")]
+        public async Task<IActionResult> RegenerateArtworkToken(int id, int variantId)
+        {
+            var orderItem = await _context.OrderItems
+                .Include(oi => oi.Variant).ThenInclude(v => v.Product)
+                .Include(oi => oi.Order)
+                .FirstOrDefaultAsync(oi => oi.OrderId == id && oi.VariantId == variantId);
+
+            if (orderItem == null)
+                return NotFound("Order item not found.");
+
+            if (!orderItem.Variant.Product.RequiresArtwork)
+                return BadRequest("This item does not require artwork.");
+
+            var emailTo = orderItem.Order.UserId.HasValue
+                ? (await _context.Users.FindAsync(orderItem.Order.UserId))?.Email
+                : orderItem.Order.GuestEmail;
+
+            if (emailTo == null)
+                return BadRequest("No email address on file for this order.");
+
+            var now = DateTime.UtcNow;
+
+            var existingUnused = await _context.ArtworkUploadTokens
+                .Where(t => t.OrderId == id
+                            && t.VariantId == variantId
+                            && t.UsedAt == null
+                            && t.InvalidatedAt == null)
+                .ToListAsync();
+            foreach (var t in existingUnused) t.InvalidatedAt = now;
+
+            var newToken = new ArtworkUploadToken
+            {
+                Token = Guid.NewGuid().ToString("N"),
+                OrderId = id,
+                VariantId = variantId,
+                CreatedAt = now,
+            };
+            _context.ArtworkUploadTokens.Add(newToken);
+            await _context.SaveChangesAsync();
+
+            // uses FrontendBaseUrl property
+            try
+            {
+                if (_emailService != null)
+                {
+                    await _emailService.SendArtworkUploadRequestAsync(
+                        emailTo,
+                        id,
+                        new List<(string, string, string)>
+                        {
+                            (
+                                orderItem.Variant.Product.ProductName,
+                                orderItem.Variant.Size,
+                                $"{FrontendBaseUrl}/upload-artwork/{newToken.Token}"
+                            )
+                        }
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Email failed: {ex.Message}");
+            }
+
+            return Ok(new { message = "New artwork upload link emailed.", token = newToken.Token });
         }
     }
 }

@@ -152,6 +152,47 @@ namespace YpsiMarketXPrint.API.Services
             await _resend.EmailSendAsync(message);
         }
 
+        public async Task SendArtworkUploadRequestAsync(
+            string toEmail,
+            int orderId,
+            List<(string ProductName, string Size, string UploadUrl)> items
+        )
+        {
+            var itemsHtml = string.Join("", items.Select(i => $"""
+                <div style="background: white; border-radius: 8px; padding: 16px; margin: 12px 0; border: 1px solid #eee;">
+                    <p style="margin: 0 0 4px; font-weight: bold; color: #1B2A4A;">{i.ProductName}</p>
+                    <p style="margin: 0 0 12px; color: #888; font-size: 14px;">Size: {i.Size}</p>
+                    <a href="{i.UploadUrl}"
+                       style="display: inline-block; padding: 10px 20px; background: #E8620A; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px;">
+                        📎 Upload artwork
+                    </a>
+                </div>
+            """));
+
+            var message = new EmailMessage();
+            message.From = From;
+            message.To.Add(toEmail);
+            message.Subject = $"Artwork needed for order #{orderId} — Ypsi Marketing & Print";
+            message.HtmlBody = $"""
+                    <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                        <div style="background: #1B2A4A; padding: 24px; text-align: center;">
+                            <h1 style="color: white; margin: 0; font-size: 24px;">Ypsi Marketing & Print</h1>
+                        </div>
+                        <div style="padding: 32px; background: #f9f9f9;">
+                            <h2 style="color: #1B2A4A;">We need your artwork</h2>
+                            <p style="color: #555;">Thanks for ordering! Before we can start on order <strong>#{orderId}</strong>, we need the artwork for the item(s) below. Click each button to upload.</p>
+                            {itemsHtml}
+                            <p style="color: #888; font-size: 13px; margin-top: 24px;">Each link can only be used once. If you need a new link, reply to this email and we'll send one.</p>
+                        </div>
+                        <div style="background: #1B2A4A; padding: 16px; text-align: center;">
+                            <p style="color: #8899bb; margin: 0; font-size: 12px;">© 2026 Ypsi Marketing & Print Company</p>
+                        </div>
+                    </div>
+                """;
+
+            await _resend.EmailSendAsync(message);
+        }
+
         public async Task SendPromotionalEmailAsync(
             List<string> recipients,
             string subject,

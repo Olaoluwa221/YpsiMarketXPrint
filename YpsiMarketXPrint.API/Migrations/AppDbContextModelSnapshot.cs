@@ -22,6 +22,43 @@ namespace YpsiMarketXPrint.API.Migrations
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
+            modelBuilder.Entity("YpsiMarketXPrint.API.Models.ArtworkUploadToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("InvalidatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("VariantId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId", "VariantId");
+
+                    b.ToTable("ArtworkUploadTokens");
+                });
+
             modelBuilder.Entity("YpsiMarketXPrint.API.Models.Cart", b =>
                 {
                     b.Property<int>("CartId")
@@ -108,8 +145,8 @@ namespace YpsiMarketXPrint.API.Migrations
                     b.Property<int>("VariantId")
                         .HasColumnType("int");
 
-                    b.Property<string>("ArtworkUrl")
-                        .HasColumnType("longtext");
+                    b.Property<int?>("ArtworkId")
+                        .HasColumnType("int");
 
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
@@ -118,6 +155,8 @@ namespace YpsiMarketXPrint.API.Migrations
                         .HasColumnType("decimal(10,2)");
 
                     b.HasKey("OrderId", "VariantId");
+
+                    b.HasIndex("ArtworkId");
 
                     b.HasIndex("VariantId");
 
@@ -164,7 +203,7 @@ namespace YpsiMarketXPrint.API.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
-                    b.Property<int>("UploaderId")
+                    b.Property<int?>("UploaderId")
                         .HasColumnType("int");
 
                     b.HasKey("PictureId");
@@ -296,6 +335,17 @@ namespace YpsiMarketXPrint.API.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("YpsiMarketXPrint.API.Models.ArtworkUploadToken", b =>
+                {
+                    b.HasOne("YpsiMarketXPrint.API.Models.OrderItem", "OrderItem")
+                        .WithMany()
+                        .HasForeignKey("OrderId", "VariantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OrderItem");
+                });
+
             modelBuilder.Entity("YpsiMarketXPrint.API.Models.Cart", b =>
                 {
                     b.HasOne("YpsiMarketXPrint.API.Models.User", "User")
@@ -337,6 +387,11 @@ namespace YpsiMarketXPrint.API.Migrations
 
             modelBuilder.Entity("YpsiMarketXPrint.API.Models.OrderItem", b =>
                 {
+                    b.HasOne("YpsiMarketXPrint.API.Models.Picture", "Artwork")
+                        .WithMany("OrderItems")
+                        .HasForeignKey("ArtworkId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("YpsiMarketXPrint.API.Models.Order", "Order")
                         .WithMany("OrderItems")
                         .HasForeignKey("OrderId")
@@ -348,6 +403,8 @@ namespace YpsiMarketXPrint.API.Migrations
                         .HasForeignKey("VariantId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Artwork");
 
                     b.Navigation("Order");
 
@@ -369,9 +426,7 @@ namespace YpsiMarketXPrint.API.Migrations
                 {
                     b.HasOne("YpsiMarketXPrint.API.Models.User", "Uploader")
                         .WithMany("Pictures")
-                        .HasForeignKey("UploaderId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("UploaderId");
 
                     b.Navigation("Uploader");
                 });
@@ -429,6 +484,8 @@ namespace YpsiMarketXPrint.API.Migrations
 
             modelBuilder.Entity("YpsiMarketXPrint.API.Models.Picture", b =>
                 {
+                    b.Navigation("OrderItems");
+
                     b.Navigation("ProductPictures");
                 });
 

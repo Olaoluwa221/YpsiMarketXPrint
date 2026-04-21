@@ -19,6 +19,7 @@ namespace YpsiMarketXPrint.API.Data
         public DbSet<CartItem> CartItems { get; set; }
         public DbSet<ProductType> ProductTypes { get; set; }
         public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
+        public DbSet<ArtworkUploadToken> ArtworkUploadTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -30,6 +31,24 @@ namespace YpsiMarketXPrint.API.Data
 
             // Compound primary key for OrderItem - now uses VariantId
             modelBuilder.Entity<OrderItem>().HasKey(oi => new { oi.OrderId, oi.VariantId });
+
+            // OrderItem.ArtworkId -> Picture (optional, restrict delete so order history is preserved)
+            modelBuilder.Entity<OrderItem>()
+                .HasOne(oi => oi.Artwork)
+                .WithMany(p => p.OrderItems)
+                .HasForeignKey(oi => oi.ArtworkId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ArtworkUploadToken -> OrderItem (composite FK)
+            modelBuilder.Entity<ArtworkUploadToken>()
+                .HasOne(t => t.OrderItem)
+                .WithMany()
+                .HasForeignKey(t => new { t.OrderId, t.VariantId })
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ArtworkUploadToken>()
+                .HasIndex(t => t.Token)
+                .IsUnique();
 
             // Primary key for ProductVariant
             modelBuilder.Entity<ProductVariant>().HasKey(v => v.VariantId);
