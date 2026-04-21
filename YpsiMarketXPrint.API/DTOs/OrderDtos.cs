@@ -18,7 +18,9 @@
         public DateTime DateOrdered { get; set; }
         public string OrderStatus { get; set; } = null!;
         public string DeliveryMethod { get; set; } = "shipping";
-        public decimal Total => Items.Sum(i => i.Subtotal);
+        public decimal ShippingCost { get; set; } = 0;
+        public decimal Subtotal => Items.Sum(i => i.Subtotal);
+        public decimal Total => Subtotal + ShippingCost;
         public List<OrderItemDto> Items { get; set; } = [];
     }
 
@@ -37,6 +39,7 @@
     public class CreateIntentDto
     {
         public List<GuestCartItemDto>? CartItems { get; set; }
+        public string? DeliveryMethod { get; set; } = "Shipping";
     }
 
     public class GuestCartItemDto

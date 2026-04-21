@@ -28,12 +28,11 @@ namespace YpsiMarketXPrint.API.Controllers
         {
             StripeConfiguration.ApiKey = _config["Stripe:SecretKey"];
 
-            long amount = 0;
+            decimal subtotal = 0;
 
             var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (userIdClaim != null)
             {
-                // Logged in — calculate from server-side cart
                 var userId = int.Parse(userIdClaim);
                 var cart = await _context.Carts
                     .Include(c => c.CartItems)
@@ -43,11 +42,10 @@ namespace YpsiMarketXPrint.API.Controllers
                 if (cart == null || !cart.CartItems.Any())
                     return BadRequest("Cart is empty.");
 
-                amount = (long)(cart.CartItems.Sum(ci => ci.Variant.Price * ci.Quantity) * 100);
+                subtotal = cart.CartItems.Sum(ci => ci.Variant.Price * ci.Quantity);
             }
             else
             {
-                // Guest — calculate from submitted cart items
                 if (dto.CartItems == null || !dto.CartItems.Any())
                     return BadRequest("Cart is empty.");
 
@@ -56,12 +54,20 @@ namespace YpsiMarketXPrint.API.Controllers
                     .Where(v => variantIds.Contains(v.VariantId))
                     .ToListAsync();
 
-                amount = (long)(dto.CartItems.Sum(ci =>
+                subtotal = dto.CartItems.Sum(ci =>
                 {
                     var variant = variants.FirstOrDefault(v => v.VariantId == ci.VariantId);
                     return variant != null ? variant.Price * ci.Quantity : 0;
-                }) * 100);
+                });
             }
+
+            // Add shipping cost if applicable
+            var shippingCost = string.Equals(dto.DeliveryMethod, "Pickup", StringComparison.OrdinalIgnoreCase)
+                ? 0m
+                : 8.00m;
+
+            var total = subtotal + shippingCost;
+            var amount = (long)(total * 100);
 
             if (amount <= 0)
                 return BadRequest("Invalid order amount.");

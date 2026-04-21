@@ -9,7 +9,7 @@ import ArtworkUploader from '../components/ArtworkUploader'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
-function CheckoutForm({ cart, user }) {
+function CheckoutForm({ cart, user, deliveryMethod, setDeliveryMethod }) {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const stripe = useStripe()
@@ -17,7 +17,6 @@ function CheckoutForm({ cart, user }) {
   const [placing, setPlacing] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const [confirmedOrderId, setConfirmedOrderId] = useState(null)
-  const [deliveryMethod, setDeliveryMethod] = useState('shipping')
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '',
     address: '', city: '', state: '', zip: '',
@@ -73,7 +72,6 @@ function CheckoutForm({ cart, user }) {
       <form onSubmit={handleSubmit}>
         <div className="flex flex-col lg:flex-row gap-8">
 
-          {/* Left — form */}
           <div className="flex-1 space-y-6">
 
             {/* Delivery method */}
@@ -81,18 +79,16 @@ function CheckoutForm({ cart, user }) {
               <h2 className="text-lg font-bold mb-4" style={{ color: '#1B2A4A' }}>Delivery method</h2>
               <div className="grid grid-cols-2 gap-4">
                 <button type="button" onClick={() => setDeliveryMethod('shipping')}
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${deliveryMethod === 'shipping' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-300'
-                    }`}>
+                  className={`p-4 rounded-xl border-2 text-left transition-all ${deliveryMethod === 'shipping' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-300'}`}>
                   <div className="text-2xl mb-2">🚚</div>
                   <div className="font-semibold text-sm" style={{ color: '#1B2A4A' }}>Shipping</div>
-                  <div className="text-xs text-gray-400 mt-0.5">Delivered to your door</div>
+                  <div className="text-xs text-gray-400 mt-0.5">+$8.00 delivered to your door</div>
                 </button>
                 <button type="button" onClick={() => setDeliveryMethod('pickup')}
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${deliveryMethod === 'pickup' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-300'
-                    }`}>
+                  className={`p-4 rounded-xl border-2 text-left transition-all ${deliveryMethod === 'pickup' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 hover:border-orange-300'}`}>
                   <div className="text-2xl mb-2">🏪</div>
                   <div className="font-semibold text-sm" style={{ color: '#1B2A4A' }}>Pickup</div>
-                  <div className="text-xs text-gray-400 mt-0.5">Pick up in store</div>
+                  <div className="text-xs text-gray-400 mt-0.5">Free — pick up in store</div>
                 </button>
               </div>
             </div>
@@ -201,11 +197,22 @@ function CheckoutForm({ cart, user }) {
                       </div>
                     ))}
                   </div>
-                  <div className="border-t border-gray-100 pt-4 mb-6">
-                    <div className="flex justify-between">
+
+                  <div className="border-t border-gray-100 pt-4 mb-2">
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-gray-500">Subtotal</span>
+                      <span className="font-medium" style={{ color: '#1B2A4A' }}>${cart.total.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm mb-4">
+                      <span className="text-gray-500">Shipping</span>
+                      <span className="font-medium" style={{ color: '#1B2A4A' }}>
+                        {deliveryMethod === 'pickup' ? 'Free (pickup)' : '$8.00'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between pt-3 border-t border-gray-100">
                       <span className="font-bold" style={{ color: '#1B2A4A' }}>Total</span>
                       <span className="font-bold text-xl" style={{ color: '#E8620A' }}>
-                        ${cart.total.toFixed(2)}
+                        ${(cart.total + (deliveryMethod === 'pickup' ? 0 : 8)).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -235,7 +242,6 @@ function CheckoutForm({ cart, user }) {
               Order <span className="font-semibold" style={{ color: '#1B2A4A' }}>#{confirmedOrderId}</span> has been placed.
             </p>
 
-            {/* Artwork upload for items that need it */}
             {cart?.items?.some(i => i.requiresArtwork) && (
               <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6 text-left">
                 <p className="text-sm font-semibold mb-3" style={{ color: '#1B2A4A' }}>📎 Upload your artwork</p>
@@ -277,6 +283,7 @@ export default function Checkout() {
   const [cart, setCart] = useState(null)
   const [loading, setLoading] = useState(true)
   const [clientSecret, setClientSecret] = useState(null)
+  const [deliveryMethod, setDeliveryMethod] = useState('shipping')
 
   useEffect(() => {
     const fetchCart = async () => {
@@ -298,14 +305,6 @@ export default function Checkout() {
         }
 
         setCart(cartData)
-
-        const intentRes = await api.post('/Payments/create-intent', {
-          cartItems: user ? null : cartData.items.map(i => ({
-            variantId: i.variantId,
-            quantity: i.quantity
-          }))
-        })
-        setClientSecret(intentRes.data.clientSecret)
       } catch {
         navigate('/cart')
       } finally {
@@ -314,6 +313,26 @@ export default function Checkout() {
     }
     fetchCart()
   }, [])
+
+  // Recreate payment intent when delivery method changes
+  useEffect(() => {
+    if (!cart) return
+    const createIntent = async () => {
+      try {
+        const intentRes = await api.post('/Payments/create-intent', {
+          cartItems: user ? null : cart.items.map(i => ({
+            variantId: i.variantId,
+            quantity: i.quantity
+          })),
+          deliveryMethod: deliveryMethod === 'pickup' ? 'Pickup' : 'Shipping'
+        })
+        setClientSecret(intentRes.data.clientSecret)
+      } catch (err) {
+        console.error('Failed to create payment intent', err)
+      }
+    }
+    createIntent()
+  }, [cart, deliveryMethod])
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -327,8 +346,17 @@ export default function Checkout() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-bold mb-8" style={{ color: '#1B2A4A' }}>Checkout</h1>
-        <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'stripe' } }}>
-          <CheckoutForm cart={cart} user={user} />
+        <Elements
+          stripe={stripePromise}
+          options={{ clientSecret, appearance: { theme: 'stripe' } }}
+          key={clientSecret}
+        >
+          <CheckoutForm
+            cart={cart}
+            user={user}
+            deliveryMethod={deliveryMethod}
+            setDeliveryMethod={setDeliveryMethod}
+          />
         </Elements>
       </div>
     </div>
