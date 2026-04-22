@@ -27,7 +27,7 @@ Make sure the following are installed on your machine:
 - [Docker Desktop](https://www.docker.com/products/docker-desktop) — enable WSL2 backend on Windows
 - [Node.js LTS](https://nodejs.org)
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- [Visual Studio 2022](https://visualstudio.microsoft.com) with the **ASP.NET and web development** workload
+- [Visual Studio 2026](https://visualstudio.microsoft.com) with the **ASP.NET and web development** workload
 
 ---
 
