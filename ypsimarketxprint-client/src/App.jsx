@@ -18,6 +18,7 @@ import AdminEmails from './pages/admin/AdminEmails'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import UploadArtwork from './pages/UploadArtwork'
+import Unsubscribe from './pages/Unsubscribe'
 import AdminUsers from './pages/admin/AdminUsers'
 
 function ProtectedRoute({ children, adminOnly = false }) {
@@ -46,6 +47,7 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/upload-artwork/:token" element={<UploadArtwork />} />
+          <Route path="/unsubscribe/:token" element={<Unsubscribe />} />
           <Route path="/admin/users" element={<ProtectedRoute><AdminUsers /></ProtectedRoute>} />
           <Route path="/profile" element={
             <ProtectedRoute><Profile /></ProtectedRoute>

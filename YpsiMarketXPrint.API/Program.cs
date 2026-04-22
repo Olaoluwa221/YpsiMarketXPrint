@@ -1,6 +1,8 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Resend;
@@ -82,6 +84,46 @@ namespace YpsiMarketXPrint.API
                 options.ApiToken = builder.Configuration["Resend:ApiKey"]!;
             });
             builder.Services.AddSingleton<EmailService>();
+
+            // Rate limiting — keyed by IP address (X-Forwarded-For respected if configured)
+            builder.Services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+                static string KeyBy(HttpContext ctx) =>
+                    ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+                // Tight: login + password reset — brute-force / enumeration targets
+                options.AddPolicy("auth-strict", ctx =>
+                    RateLimitPartition.GetFixedWindowLimiter(KeyBy(ctx), _ =>
+                        new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 5,
+                            Window = TimeSpan.FromMinutes(1),
+                            QueueLimit = 0,
+                        }));
+
+                // Medium: registration, email-triggering, checkout
+                options.AddPolicy("auth-standard", ctx =>
+                    RateLimitPartition.GetFixedWindowLimiter(KeyBy(ctx), _ =>
+                        new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 10,
+                            Window = TimeSpan.FromMinutes(1),
+                            QueueLimit = 0,
+                        }));
+
+                // Loose global default for everything else
+                options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+                    RateLimitPartition.GetFixedWindowLimiter(KeyBy(ctx), _ =>
+                        new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 120,
+                            Window = TimeSpan.FromMinutes(1),
+                            QueueLimit = 0,
+                        }));
+            });
+
             var app = builder.Build();
 
             if (app.Environment.IsDevelopment())
@@ -93,6 +135,7 @@ namespace YpsiMarketXPrint.API
             app.UseHttpsRedirection();
             app.UseStaticFiles();
             app.UseCors("AllowFrontend");
+            app.UseRateLimiter();
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();

@@ -1,7 +1,9 @@
 ﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Stripe;
 using YpsiMarketXPrint.API.Data;
 using YpsiMarketXPrint.API.DTOs;
 using YpsiMarketXPrint.API.Models;
@@ -31,8 +33,12 @@ namespace YpsiMarketXPrint.API.Controllers
         // POST api/orders/checkout
         [HttpPost("checkout")]
         [AllowAnonymous]
+        [EnableRateLimiting("auth-standard")]
         public async Task<IActionResult> Checkout([FromBody] GuestCheckoutDto dto)
         {
+            if (string.IsNullOrWhiteSpace(dto?.PaymentIntentId))
+                return BadRequest("Payment intent is required.");
+
             int? userId = null;
             string? guestEmail = null;
             Cart? cart = null;
@@ -45,10 +51,13 @@ namespace YpsiMarketXPrint.API.Controllers
                     .Include(c => c.CartItems)
                         .ThenInclude(ci => ci.Variant)
                     .FirstOrDefaultAsync(c => c.UserId == userId);
+
+                if (cart == null || !cart.CartItems.Any())
+                    return BadRequest("Your cart is empty.");
             }
             else
             {
-                if (string.IsNullOrWhiteSpace(dto?.GuestEmail))
+                if (string.IsNullOrWhiteSpace(dto.GuestEmail))
                     return BadRequest("Email is required for guest checkout.");
                 guestEmail = dto.GuestEmail;
 
@@ -56,62 +65,117 @@ namespace YpsiMarketXPrint.API.Controllers
                     return BadRequest("Your cart is empty.");
             }
 
-            if (userId != null && (cart == null || !cart.CartItems.Any()))
-                return BadRequest("Your cart is empty.");
-
-            var deliveryMethod = Enum.TryParse<DeliveryMethod>(dto?.DeliveryMethod, true, out var dm)
+            var deliveryMethod = Enum.TryParse<DeliveryMethod>(dto.DeliveryMethod, true, out var dm)
                 ? dm
                 : DeliveryMethod.Shipping;
+            var shippingCost = deliveryMethod == DeliveryMethod.Shipping ? 8.00m : 0m;
 
+            if (deliveryMethod == DeliveryMethod.Shipping)
+            {
+                if (string.IsNullOrWhiteSpace(dto.FirstName) ||
+                    string.IsNullOrWhiteSpace(dto.LastName) ||
+                    string.IsNullOrWhiteSpace(dto.Address) ||
+                    string.IsNullOrWhiteSpace(dto.City) ||
+                    string.IsNullOrWhiteSpace(dto.State) ||
+                    string.IsNullOrWhiteSpace(dto.Zip))
+                {
+                    return BadRequest("Shipping address is required.");
+                }
+            }
+
+            // ---- Compute line items + server-side total BEFORE trusting the client ----
+            List<(int VariantId, int Quantity, decimal UnitPrice)> lineItems;
+
+            if (userId != null && cart != null)
+            {
+                lineItems = cart.CartItems
+                    .Select(ci => (ci.VariantId, ci.Quantity, ci.Variant.Price))
+                    .ToList();
+            }
+            else
+            {
+                var variantIds = dto.CartItems!.Select(ci => ci.VariantId).ToList();
+                var variants = await _context.ProductVariants
+                    .Where(v => variantIds.Contains(v.VariantId))
+                    .ToDictionaryAsync(v => v.VariantId);
+
+                var built = new List<(int, int, decimal)>();
+                foreach (var ci in dto.CartItems)
+                {
+                    if (ci.Quantity <= 0 || ci.Quantity > 1000)
+                        return BadRequest("Invalid item quantity.");
+                    if (!variants.TryGetValue(ci.VariantId, out var v))
+                        return BadRequest("Invalid variant in cart.");
+                    built.Add((ci.VariantId, ci.Quantity, v.Price));
+                }
+                lineItems = built;
+            }
+
+            var expectedSubtotal = lineItems.Sum(li => li.UnitPrice * li.Quantity);
+            var expectedTotalCents = (long)((expectedSubtotal + shippingCost) * 100);
+
+            // ---- Verify payment with Stripe ----
+            StripeConfiguration.ApiKey = _config["Stripe:SecretKey"];
+            PaymentIntent intent;
+            try
+            {
+                intent = await new PaymentIntentService().GetAsync(dto.PaymentIntentId);
+            }
+            catch (StripeException)
+            {
+                return BadRequest("Payment could not be verified.");
+            }
+
+            if (intent.Status != "succeeded")
+                return BadRequest("Payment has not been completed.");
+
+            if (intent.Currency != "usd" || intent.Amount != expectedTotalCents)
+                return BadRequest("Payment amount does not match order total.");
+
+            // Prevent replay: one intent, one order.
+            var alreadyClaimed = await _context.Orders
+                .AnyAsync(o => o.PaymentIntentId == dto.PaymentIntentId);
+            if (alreadyClaimed)
+                return BadRequest("This payment has already been used for another order.");
+
+            // ---- Payment verified. Now create the order. ----
+            var isShipping = deliveryMethod == DeliveryMethod.Shipping;
             var order = new Order
             {
                 UserId = userId,
                 GuestEmail = guestEmail,
+                PaymentIntentId = dto.PaymentIntentId,
                 DateOrdered = DateTime.UtcNow,
                 OrderStatus = OrderStatus.Pending,
                 DeliveryMethod = deliveryMethod,
-                ShippingCost = deliveryMethod == DeliveryMethod.Shipping ? 8.00m : 0m,
-            };
+                ShippingCost = shippingCost,
 
+                ContactFirstName = dto.FirstName,
+                ContactLastName = dto.LastName,
+                ContactPhone = dto.Phone,
+                ShippingAddress = isShipping ? dto.Address : null,
+                ShippingCity = isShipping ? dto.City : null,
+                ShippingState = isShipping ? dto.State : null,
+                ShippingZip = isShipping ? dto.Zip : null,
+            };
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
 
-            List<OrderItem> orderItems;
+            var orderItems = lineItems.Select(li => new OrderItem
+            {
+                OrderId = order.OrderId,
+                VariantId = li.VariantId,
+                Quantity = li.Quantity,
+                UnitPrice = li.UnitPrice,
+            }).ToList();
+            _context.OrderItems.AddRange(orderItems);
 
             if (userId != null && cart != null)
             {
-                orderItems = cart.CartItems.Select(ci => new OrderItem
-                {
-                    OrderId = order.OrderId,
-                    VariantId = ci.VariantId,
-                    Quantity = ci.Quantity,
-                    UnitPrice = ci.Variant.Price,
-                }).ToList();
-
                 _context.CartItems.RemoveRange(cart.CartItems);
                 cart.UpdatedAt = DateTime.UtcNow;
             }
-            else
-            {
-                var variantIds = dto!.CartItems!.Select(ci => ci.VariantId).ToList();
-                var variants = await _context.ProductVariants
-                    .Where(v => variantIds.Contains(v.VariantId))
-                    .ToListAsync();
 
-                orderItems = dto.CartItems.Select(ci =>
-                {
-                    var variant = variants.First(v => v.VariantId == ci.VariantId);
-                    return new OrderItem
-                    {
-                        OrderId = order.OrderId,
-                        VariantId = ci.VariantId,
-                        Quantity = ci.Quantity,
-                        UnitPrice = variant.Price,
-                    };
-                }).ToList();
-            }
-
-            _context.OrderItems.AddRange(orderItems);
             await _context.SaveChangesAsync();
 
             try
@@ -119,7 +183,7 @@ namespace YpsiMarketXPrint.API.Controllers
                 var emailTo = guestEmail ?? (await _context.Users.FindAsync(userId))?.Email;
                 if (_emailService != null && emailTo != null)
                 {
-                    var total = orderItems.Sum(oi => oi.UnitPrice * oi.Quantity) + order.ShippingCost;
+                    var total = expectedSubtotal + shippingCost;
                     await _emailService.SendOrderConfirmationAsync(emailTo, order.OrderId, total);
 
                     await GenerateAndSendArtworkTokensAsync(order.OrderId, emailTo);
@@ -244,6 +308,14 @@ namespace YpsiMarketXPrint.API.Controllers
                     OrderStatus = o.OrderStatus.ToString().ToLower(),
                     DeliveryMethod = o.DeliveryMethod.ToString().ToLower(),
                     ShippingCost = o.ShippingCost,
+                    ContactFirstName = o.ContactFirstName,
+                    ContactLastName = o.ContactLastName,
+                    ContactPhone = o.ContactPhone,
+                    ContactEmail = o.User != null ? o.User.Email : o.GuestEmail,
+                    ShippingAddress = o.ShippingAddress,
+                    ShippingCity = o.ShippingCity,
+                    ShippingState = o.ShippingState,
+                    ShippingZip = o.ShippingZip,
                     Items = o.OrderItems.Select(oi => new OrderItemDto
                     {
                         VariantId = oi.VariantId,
@@ -272,6 +344,7 @@ namespace YpsiMarketXPrint.API.Controllers
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Variant)
                         .ThenInclude(v => v.Product)
+                .Include(o => o.User)
                 .FirstOrDefaultAsync(o => o.OrderId == id);
 
             if (order == null)
@@ -287,6 +360,14 @@ namespace YpsiMarketXPrint.API.Controllers
                 OrderStatus = order.OrderStatus.ToString().ToLower(),
                 DeliveryMethod = order.DeliveryMethod.ToString().ToLower(),
                 ShippingCost = order.ShippingCost,
+                ContactFirstName = order.ContactFirstName,
+                ContactLastName = order.ContactLastName,
+                ContactPhone = order.ContactPhone,
+                ContactEmail = order.User?.Email ?? order.GuestEmail,
+                ShippingAddress = order.ShippingAddress,
+                ShippingCity = order.ShippingCity,
+                ShippingState = order.ShippingState,
+                ShippingZip = order.ShippingZip,
                 Items = order.OrderItems.Select(oi => new OrderItemDto
                 {
                     VariantId = oi.VariantId,
@@ -320,6 +401,14 @@ namespace YpsiMarketXPrint.API.Controllers
                     OrderStatus = o.OrderStatus.ToString().ToLower(),
                     DeliveryMethod = o.DeliveryMethod.ToString().ToLower(),
                     ShippingCost = o.ShippingCost,
+                    ContactFirstName = o.ContactFirstName,
+                    ContactLastName = o.ContactLastName,
+                    ContactPhone = o.ContactPhone,
+                    ContactEmail = o.User != null ? o.User.Email : o.GuestEmail,
+                    ShippingAddress = o.ShippingAddress,
+                    ShippingCity = o.ShippingCity,
+                    ShippingState = o.ShippingState,
+                    ShippingZip = o.ShippingZip,
                     Items = o.OrderItems.Select(oi => new OrderItemDto
                     {
                         VariantId = oi.VariantId,

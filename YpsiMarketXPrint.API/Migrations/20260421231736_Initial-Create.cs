@@ -110,12 +110,28 @@ namespace YpsiMarketXPrint.API.Migrations
                     UserId = table.Column<int>(type: "int", nullable: true),
                     GuestEmail = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
+                    PaymentIntentId = table.Column<string>(type: "varchar(255)", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
                     DateOrdered = table.Column<DateTime>(type: "datetime(6)", nullable: false),
                     DeliveryMethod = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     OrderStatus = table.Column<string>(type: "longtext", nullable: false)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    ShippingCost = table.Column<decimal>(type: "decimal(65,30)", nullable: false)
+                    ShippingCost = table.Column<decimal>(type: "decimal(65,30)", nullable: false),
+                    ContactFirstName = table.Column<string>(type: "longtext", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ContactLastName = table.Column<string>(type: "longtext", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ContactPhone = table.Column<string>(type: "longtext", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ShippingAddress = table.Column<string>(type: "longtext", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ShippingCity = table.Column<string>(type: "longtext", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ShippingState = table.Column<string>(type: "longtext", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4"),
+                    ShippingZip = table.Column<string>(type: "longtext", nullable: true)
+                        .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
                 {
@@ -339,6 +355,12 @@ namespace YpsiMarketXPrint.API.Migrations
                 name: "IX_OrderItems_VariantId",
                 table: "OrderItems",
                 column: "VariantId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Orders_PaymentIntentId",
+                table: "Orders",
+                column: "PaymentIntentId",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Orders_UserId",

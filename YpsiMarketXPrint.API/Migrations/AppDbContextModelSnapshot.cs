@@ -110,6 +110,15 @@ namespace YpsiMarketXPrint.API.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("OrderId"));
 
+                    b.Property<string>("ContactFirstName")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ContactLastName")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ContactPhone")
+                        .HasColumnType("longtext");
+
                     b.Property<DateTime>("DateOrdered")
                         .HasColumnType("datetime(6)");
 
@@ -124,13 +133,31 @@ namespace YpsiMarketXPrint.API.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<string>("PaymentIntentId")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("ShippingAddress")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ShippingCity")
+                        .HasColumnType("longtext");
+
                     b.Property<decimal>("ShippingCost")
                         .HasColumnType("decimal(65,30)");
+
+                    b.Property<string>("ShippingState")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("ShippingZip")
+                        .HasColumnType("longtext");
 
                     b.Property<int?>("UserId")
                         .HasColumnType("int");
 
                     b.HasKey("OrderId");
+
+                    b.HasIndex("PaymentIntentId")
+                        .IsUnique();
 
                     b.HasIndex("UserId");
 

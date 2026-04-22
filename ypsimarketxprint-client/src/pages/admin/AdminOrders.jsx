@@ -230,6 +230,31 @@ export default function AdminOrders() {
                 </div>
               </div>
 
+              {(selectedOrder.contactFirstName || selectedOrder.contactEmail) && (
+                <div className="border-t border-gray-100 pt-4 mb-6">
+                  <h3 className="text-sm font-semibold mb-2" style={{ color: '#1B2A4A' }}>Customer</h3>
+                  <div className="text-sm text-gray-600 space-y-0.5">
+                    {(selectedOrder.contactFirstName || selectedOrder.contactLastName) && (
+                      <p style={{ color: '#1B2A4A' }} className="font-medium">
+                        {[selectedOrder.contactFirstName, selectedOrder.contactLastName].filter(Boolean).join(' ')}
+                      </p>
+                    )}
+                    {selectedOrder.contactEmail && <p>{selectedOrder.contactEmail}</p>}
+                    {selectedOrder.contactPhone && <p>{selectedOrder.contactPhone}</p>}
+                  </div>
+                  {selectedOrder.deliveryMethod === 'shipping' && selectedOrder.shippingAddress && (
+                    <div className="mt-3 text-sm text-gray-600">
+                      <p className="text-xs font-semibold mb-1" style={{ color: '#1B2A4A' }}>Ship to</p>
+                      <p>{selectedOrder.shippingAddress}</p>
+                      <p>
+                        {[selectedOrder.shippingCity, selectedOrder.shippingState, selectedOrder.shippingZip]
+                          .filter(Boolean).join(', ')}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="border-t border-gray-100 pt-4 mb-6">
                 <h3 className="text-sm font-semibold mb-3" style={{ color: '#1B2A4A' }}>Items</h3>
                 <div className="space-y-3">

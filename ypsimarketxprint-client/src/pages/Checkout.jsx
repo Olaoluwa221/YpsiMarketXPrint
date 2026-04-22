@@ -8,7 +8,7 @@ import { useToast } from '../context/ToastContext'
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY)
 
-function CheckoutForm({ cart, user, deliveryMethod, setDeliveryMethod }) {
+function CheckoutForm({ cart, user, deliveryMethod, setDeliveryMethod, paymentIntentId }) {
   const { showToast } = useToast()
   const navigate = useNavigate()
   const stripe = useStripe()
@@ -43,7 +43,15 @@ function CheckoutForm({ cart, user, deliveryMethod, setDeliveryMethod }) {
         res = await api.post('/Orders/checkout', {
           guestEmail: null,
           cartItems: null,
-          deliveryMethod: deliveryMethod === 'pickup' ? 'Pickup' : 'Shipping'
+          deliveryMethod: deliveryMethod === 'pickup' ? 'Pickup' : 'Shipping',
+          paymentIntentId,
+          firstName: form.firstName,
+          lastName: form.lastName,
+          phone: form.phone,
+          address: deliveryMethod === 'shipping' ? form.address : null,
+          city: deliveryMethod === 'shipping' ? form.city : null,
+          state: deliveryMethod === 'shipping' ? form.state : null,
+          zip: deliveryMethod === 'shipping' ? form.zip : null,
         })
       } else {
         res = await api.post('/Orders/checkout', {
@@ -52,7 +60,15 @@ function CheckoutForm({ cart, user, deliveryMethod, setDeliveryMethod }) {
             variantId: item.variantId,
             quantity: item.quantity
           })),
-          deliveryMethod: deliveryMethod === 'pickup' ? 'Pickup' : 'Shipping'
+          deliveryMethod: deliveryMethod === 'pickup' ? 'Pickup' : 'Shipping',
+          paymentIntentId,
+          firstName: form.firstName,
+          lastName: form.lastName,
+          phone: form.phone,
+          address: deliveryMethod === 'shipping' ? form.address : null,
+          city: deliveryMethod === 'shipping' ? form.city : null,
+          state: deliveryMethod === 'shipping' ? form.state : null,
+          zip: deliveryMethod === 'shipping' ? form.zip : null,
         })
         localStorage.removeItem('guestCart')
       }
@@ -277,6 +293,7 @@ export default function Checkout() {
   const [cart, setCart] = useState(null)
   const [loading, setLoading] = useState(true)
   const [clientSecret, setClientSecret] = useState(null)
+  const [paymentIntentId, setPaymentIntentId] = useState(null)
   const [deliveryMethod, setDeliveryMethod] = useState('shipping')
 
   useEffect(() => {
@@ -321,6 +338,7 @@ export default function Checkout() {
           deliveryMethod: deliveryMethod === 'pickup' ? 'Pickup' : 'Shipping'
         })
         setClientSecret(intentRes.data.clientSecret)
+        setPaymentIntentId(intentRes.data.paymentIntentId)
       } catch (err) {
         console.error('Failed to create payment intent', err)
       }
@@ -350,6 +368,7 @@ export default function Checkout() {
             user={user}
             deliveryMethod={deliveryMethod}
             setDeliveryMethod={setDeliveryMethod}
+            paymentIntentId={paymentIntentId}
           />
         </Elements>
       </div>

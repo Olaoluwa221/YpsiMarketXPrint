@@ -23,6 +23,16 @@
         public decimal Subtotal => Items.Sum(i => i.Subtotal);
         public decimal Total => Subtotal + ShippingCost;
         public List<OrderItemDto> Items { get; set; } = [];
+
+        // Customer contact + shipping info (nullable for pickup orders)
+        public string? ContactFirstName { get; set; }
+        public string? ContactLastName { get; set; }
+        public string? ContactPhone { get; set; }
+        public string? ContactEmail { get; set; }
+        public string? ShippingAddress { get; set; }
+        public string? ShippingCity { get; set; }
+        public string? ShippingState { get; set; }
+        public string? ShippingZip { get; set; }
     }
 
     public class UpdateOrderStatusDto
@@ -35,6 +45,16 @@
         public string? GuestEmail { get; set; }
         public List<GuestCartItemDto>? CartItems { get; set; }
         public string DeliveryMethod { get; set; } = "Shipping";
+        public string? PaymentIntentId { get; set; }
+
+        // Shipping + contact info
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
+        public string? Phone { get; set; }
+        public string? Address { get; set; }
+        public string? City { get; set; }
+        public string? State { get; set; }
+        public string? Zip { get; set; }
     }
 
     public class CreateIntentDto

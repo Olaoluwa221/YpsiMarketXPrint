@@ -82,7 +82,7 @@ namespace YpsiMarketXPrint.API.Controllers
             var service = new PaymentIntentService();
             var intent = await service.CreateAsync(options);
 
-            return Ok(new { clientSecret = intent.ClientSecret });
+            return Ok(new { clientSecret = intent.ClientSecret, paymentIntentId = intent.Id });
         }
     }
 }

@@ -194,17 +194,28 @@ namespace YpsiMarketXPrint.API.Services
         }
 
         public async Task SendPromotionalEmailAsync(
-            List<string> recipients,
+            List<(int UserId, string Email)> recipients,
             string subject,
             string htmlBody
         )
         {
-            foreach (var email in recipients)
+            var frontendBase = _config["Frontend:BaseUrl"] ?? "http://localhost:5173";
+            var hmacSecret = _config["Jwt:Key"]!;
+
+            foreach (var (userId, email) in recipients)
             {
+                var token = YpsiMarketXPrint.API.Controllers.AuthController.GenerateUnsubscribeToken(userId, hmacSecret);
+                var unsubscribeUrl = $"{frontendBase}/unsubscribe/{token}";
+
                 var message = new EmailMessage();
                 message.From = From;
                 message.To.Add(email);
                 message.Subject = subject;
+                // TODO: If/when the Resend SDK exposes custom headers, set the following so
+                // Gmail / Outlook show their native "Unsubscribe" button next to the sender name:
+                //   List-Unsubscribe: <{unsubscribeUrl}>
+                //   List-Unsubscribe-Post: List-Unsubscribe=One-Click
+                // The visible footer link below works regardless and is the legally-required path.
                 message.HtmlBody = $"""
                         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
                             <div style="background: #1B2A4A; padding: 24px; text-align: center;">
@@ -214,7 +225,8 @@ namespace YpsiMarketXPrint.API.Services
                                 {htmlBody}
                             </div>
                             <div style="background: #1B2A4A; padding: 16px; text-align: center;">
-                                <p style="color: #8899bb; margin: 0; font-size: 12px;">© 2026 Ypsi Marketing & Print Company. You're receiving this because you opted in to marketing emails.</p>
+                                <p style="color: #8899bb; margin: 0 0 8px; font-size: 12px;">© 2026 Ypsi Marketing & Print Company. You're receiving this because you opted in to marketing emails.</p>
+                                <p style="margin: 0; font-size: 12px;"><a href="{unsubscribeUrl}" style="color: #8899bb; text-decoration: underline;">Unsubscribe</a></p>
                             </div>
                         </div>
                     """;

@@ -50,6 +50,11 @@ namespace YpsiMarketXPrint.API.Data
                 .HasIndex(t => t.Token)
                 .IsUnique();
 
+            // A single Stripe PaymentIntent can only claim one order
+            modelBuilder.Entity<Order>()
+                .HasIndex(o => o.PaymentIntentId)
+                .IsUnique();
+
             // Primary key for ProductVariant
             modelBuilder.Entity<ProductVariant>().HasKey(v => v.VariantId);
 
